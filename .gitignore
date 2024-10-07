@@ -23,3 +23,10 @@ go.work.sum
 
 # env file
 .env
+
+# i love you so much vim but pls
+*.swo
+*.swp
+
+# thanks tim apple
+.DS_Store
