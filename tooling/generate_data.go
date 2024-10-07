@@ -39,7 +39,6 @@ func loadConfig(filename string) (*Config, error) {
 	return &config, nil
 }
 
-// we're going to build a dsn rather than hard coding it
 func getDSN(config *Config) string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		config.Database.User,
@@ -49,7 +48,6 @@ func getDSN(config *Config) string {
 		config.Database.DbName)
 }
 
-// it's kinda random in a not-very-random kinda way
 func randomLocation() (float64, float64) {
 	latBounds := [2]float64{40.5774, 40.9176} // Rough latitude range for Manhattan, Brooklyn, Bronx
 	lonBounds := [2]float64{-74.15, -73.7004} // Rough longitude range
@@ -63,19 +61,18 @@ func randomEndorsements() []string {
 	num := rng.Intn(3) + 1
 	var selected []string
 	for i := 0; i < num; i++ {
-		selected = append(selected, endorsements[rng.Intn(len(endorsements))])
+		selected = append(selected, Endorsements[rng.Intn(len(Endorsements))])
 	}
 	return selected
 }
 
-// just to save us the trouble of having two variables that are the same
 func randomPreferences() []string {
 	return randomEndorsements()
 }
 
 func insertRestaurants(count int, stdout bool) {
 	for i := 0; i < count; i++ {
-		name := randomRestaurantName(rng)
+		name := RandomRestaurantName(rng)
 		lat, lon := randomLocation()
 		capacity := fmt.Sprintf(`{"two-top": %d, "four-top": %d, "six-top": %d}`, rng.Intn(10)+1, rng.Intn(10)+1, rng.Intn(5)+1)
 		endors := randomEndorsements()
@@ -95,7 +92,7 @@ func insertRestaurants(count int, stdout bool) {
 
 func insertDiners(count int, stdout bool) {
 	for i := 0; i < count; i++ {
-		name := randomName(rng)
+		name := RandomName(rng)
 		lat, lon := randomLocation()
 		prefs := randomPreferences()
 
@@ -145,7 +142,7 @@ func main() {
 		if err != nil {
 			logrus.Fatalf("Error connecting to the database: %v", err)
 		}
-		// Ensure db.Close() is properly handled
+		// Handle error while closing the database connection
 		defer func() {
 			if err := db.Close(); err != nil {
 				logrus.Errorf("Error closing the database connection: %v", err)

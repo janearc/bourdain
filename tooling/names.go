@@ -5,9 +5,9 @@ import (
 	"math/rand"
 )
 
-// List of name components for generating restaurant and diner names
+// Exported variables and functions
 var (
-	endorsements               = []string{"gluten-free", "kid-friendly", "paleo", "vegan", "organic", "halal", "kosher"}
+	Endorsements               = []string{"gluten-free", "kid-friendly", "paleo", "vegan", "organic", "halal", "kosher"}
 	firstNames                 = []string{"Chester", "Camden", "Harriet", "Olivia", "Arthur", "Eleanor", "Percival", "Jasper", "Florence", "Theodore", "Boris", "Natasha", "Rocky", "Bullwinkle"}
 	lastNames                  = []string{"Hackington", "Perspicacious", "Smith", "Wellington", "Crumble", "Burlington", "Peabody", "Fitzroy", "Wainwright", "Harrington"}
 	californiaAdjectives       = []string{"Sunny", "Fresh", "New", "Inverted", "Golden", "Crispy", "Hearty"}
@@ -22,13 +22,13 @@ var (
 	italianPhrases             = []string{"La Vita", "Il Gusto", "Osteria", "Bontà"}
 )
 
-func randomName(rng *rand.Rand) string {
+func RandomName(rng *rand.Rand) string {
 	firstName := firstNames[rng.Intn(len(firstNames))]
 	lastName := lastNames[rng.Intn(len(lastNames))]
 	return fmt.Sprintf("%s %s", firstName, lastName)
 }
 
-func randomRestaurantName(rng *rand.Rand) string {
+func RandomRestaurantName(rng *rand.Rand) string {
 	vibe := rng.Intn(3)
 	switch vibe {
 	case 0: // California cuisine
