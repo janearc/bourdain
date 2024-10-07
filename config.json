@@ -1,0 +1,9 @@
+{
+  "database": {
+    "user": "bourdain",
+    "password": "THE SECRET SAUCE IS HOLLANDAISE OKAY",
+    "dbname": "bookingsdb",
+    "host": "db",
+    "port": 5432
+  }
+}
