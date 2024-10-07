@@ -4,21 +4,43 @@ SCRIPT_PATH=tooling
 # Create the .env file from config.json using jq
 generate-env:
 	echo "POSTGRES_USER=$(shell jq -r '.database.user' config.json)" > .env
-	echo "POSTGRES_PASSWORD=$(shell jq -r '.database.password' config.json)" >> .env
+	echo "POSTGRES_PASSWORD='$(shell jq -r '.database.password' config.json)'" >> .env
 	echo "POSTGRES_DB=$(shell jq -r '.database.dbname' config.json)" >> .env
-
-# Run the script to generate test data to stdout
-testdata:
-	go run $(SCRIPT_PATH)/generate_data.go --stdout
 
 # Build the Docker images for the app and Postgres
 build:
 	docker-compose build
 
-# Spin up Postgres and initialize the database with data
+fresh: clean build initdb verify-db
+
+# Spin up the app service and insert data into the database
 initdb: build
-	docker-compose up app
+	# Start the db service
+	docker-compose up -d db
+	# Wait for the database to be healthy
+	@echo "Waiting for database to be healthy..."
+	@until [ "$$(docker inspect --format='{{.State.Health.Status}}' bourdain-db-1)" = "healthy" ]; do \
+		sleep 2; \
+		echo "Waiting..."; \
+	done
+	# Run the app container to insert data into the running db container
+	docker-compose run --rm app /usr/local/bin/generate_data --initdb --config=/config/config.json
+
+verify-db:
+	@echo "Verifying database schema..."
+	docker-compose exec db psql -U $(shell jq -r '.database.user' config.json) -d $(shell jq -r '.database.dbname' config.json) -c "\dt" | grep -q "restaurants" && echo "Database is healthy and schema is present." || (echo "Database verification failed." && exit 1)
+	
+# Run the app to print SQL statements to stdout (test mode)
+testinit: build
+	docker-compose run --rm app /usr/local/bin/generate_data --stdout --config=/config/config.json
 
 # Clean up containers and volumes
 clean:
 	docker-compose down -v
+	docker-compose down --remove-orphans
+
+# Generate random diner and restaurant names and print them
+names: build
+	@diner=$$(docker-compose run --rm app /usr/local/bin/generate_data --proper-name | tail -n 1) && \
+	restaurant=$$(docker-compose run --rm app /usr/local/bin/generate_data --restaurant-name | tail -n 1) && \
+	echo "$$diner requests a reservation at $$restaurant"

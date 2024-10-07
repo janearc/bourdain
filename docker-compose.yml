@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgres:15-alpine
+    image: postgis/postgis:15-3.3-alpine
+    platform: linux/amd64  # Add this line
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -11,16 +12,23 @@ services:
       - db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      retries: 5
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    platform: linux/amd64  # Add this line to ensure compatibility with your host
     environment:
-      DATABASE_URL: $(shell jq -r '"postgres://\(.database.user):\(.database.password)@\(.database.host):\(.database.port)/\(.database.dbname)?sslmode=disable"' config.json)
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable"
     depends_on:
-      - db
-    command: /usr/local/bin/generate_data --initdb --config=/config/config.json
+      db:
+        condition: service_healthy
+    volumes:
+      - ./config.json:/config/config.json
 
 volumes:
   db_data:

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/url"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -26,6 +28,41 @@ type Config struct {
 	} `json:"database"`
 }
 
+func createTables(db *sql.DB) {
+	// Enable PostGIS extension
+	_, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS postgis;`)
+	if err != nil {
+		logrus.Fatalf("Error enabling PostGIS extension: %v", err)
+	}
+
+	// Create the restaurants table
+	restaurantTable := `
+	CREATE TABLE IF NOT EXISTS restaurants (
+		id SERIAL PRIMARY KEY,
+		name TEXT NOT NULL,
+		capacity JSONB NOT NULL,
+		endorsements TEXT[] NOT NULL,
+		location GEOGRAPHY(POINT, 4326)
+	);`
+	_, err = db.Exec(restaurantTable)
+	if err != nil {
+		logrus.Fatalf("Error creating restaurants table: %v", err)
+	}
+
+	// Create the diners table
+	dinersTable := `
+	CREATE TABLE IF NOT EXISTS diners (
+		id SERIAL PRIMARY KEY,
+		name TEXT NOT NULL,
+		preferences TEXT[] NOT NULL,
+		location GEOGRAPHY(POINT, 4326)
+	);`
+	_, err = db.Exec(dinersTable)
+	if err != nil {
+		logrus.Fatalf("Error creating diners table: %v", err)
+	}
+}
+
 func loadConfig(filename string) (*Config, error) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
@@ -40,14 +77,15 @@ func loadConfig(filename string) (*Config, error) {
 }
 
 func getDSN(config *Config) string {
+	escapedUser := url.QueryEscape(config.Database.User)
+	escapedPassword := url.QueryEscape(config.Database.Password)
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		config.Database.User,
-		config.Database.Password,
+		escapedUser,
+		escapedPassword,
 		config.Database.Host,
 		config.Database.Port,
 		config.Database.DbName)
 }
-
 func randomLocation() (float64, float64) {
 	latBounds := [2]float64{40.5774, 40.9176} // Rough latitude range for Manhattan, Brooklyn, Bronx
 	lonBounds := [2]float64{-74.15, -73.7004} // Rough longitude range
@@ -70,43 +108,55 @@ func randomPreferences() []string {
 	return randomEndorsements()
 }
 
-func insertRestaurants(count int, stdout bool) {
+func insertRestaurants(count int, stdout bool, db *sql.DB) {
 	for i := 0; i < count; i++ {
-		name := RandomRestaurantName(rng)
+		name := RandomRestaurantName(rng) // No need to escape, handled by parameterized queries
 		lat, lon := randomLocation()
 		capacity := fmt.Sprintf(`{"two-top": %d, "four-top": %d, "six-top": %d}`, rng.Intn(10)+1, rng.Intn(10)+1, rng.Intn(5)+1)
 		endors := randomEndorsements()
+		endorsArray := formatArrayForPostgres(endors)
 
-		sql := fmt.Sprintf(
-			"INSERT INTO restaurants (name, capacity, endorsements, location) VALUES ('%s', '%s', '%s', ST_SetSRID(ST_MakePoint(%f, %f), 4326));",
-			name, capacity, fmt.Sprintf(`%q`, endors), lon, lat,
-		)
+		sqlStmt := "INSERT INTO restaurants (name, capacity, endorsements, location) VALUES ($1, $2, $3, ST_SetSRID(ST_MakePoint($4, $5), 4326));"
 
-		if stdout {
-			logrus.Info(sql)
+		if stdout || db == nil {
+			// For stdout mode, still need to display the query with formatted values
+			logrus.Infof("Would execute: %s", fmt.Sprintf(sqlStmt, name, capacity, endorsArray, lon, lat))
 		} else {
-			logrus.Infof("Would execute: %s", sql)
+			_, err := db.Exec(sqlStmt, name, capacity, endorsArray, lon, lat)
+			if err != nil {
+				logrus.Errorf("Error executing insert: %v", err)
+			}
 		}
 	}
 }
 
-func insertDiners(count int, stdout bool) {
+func insertDiners(count int, stdout bool, db *sql.DB) {
 	for i := 0; i < count; i++ {
-		name := RandomName(rng)
+		name := RandomName(rng) // No need to escape, handled by parameterized queries
 		lat, lon := randomLocation()
 		prefs := randomPreferences()
+		prefsArray := formatArrayForPostgres(prefs)
 
-		sql := fmt.Sprintf(
-			"INSERT INTO diners (name, preferences, location) VALUES ('%s', '%s', ST_SetSRID(ST_MakePoint(%f, %f), 4326));",
-			name, fmt.Sprintf(`%q`, prefs), lon, lat,
-		)
+		sqlStmt := "INSERT INTO diners (name, preferences, location) VALUES ($1, $2, ST_SetSRID(ST_MakePoint($3, $4), 4326));"
 
-		if stdout {
-			logrus.Info(sql)
+		if stdout || db == nil {
+			// For stdout mode, still need to display the query with formatted values
+			logrus.Infof("Would execute: %s", fmt.Sprintf(sqlStmt, name, prefsArray, lon, lat))
 		} else {
-			logrus.Infof("Would execute: %s", sql)
+			_, err := db.Exec(sqlStmt, name, prefsArray, lon, lat)
+			if err != nil {
+				logrus.Errorf("Error executing insert: %v", err)
+			}
 		}
 	}
+}
+
+func formatArrayForPostgres(arr []string) string {
+	// Escape each element and join them with commas, then wrap in curly braces
+	for i, elem := range arr {
+		arr[i] = fmt.Sprintf("\"%s\"", elem)
+	}
+	return fmt.Sprintf("{%s}", strings.Join(arr, ","))
 }
 
 func main() {
@@ -145,8 +195,9 @@ func main() {
 	dsn := getDSN(config)
 
 	if *stdout {
-		insertRestaurants(100, true)
-		insertDiners(500, true)
+		logrus.Info("Generating SQL statements...")
+		insertRestaurants(100, true, nil)
+		insertDiners(500, true, nil)
 	} else if *initdb {
 		logrus.Info("Initializing database...")
 
@@ -155,16 +206,18 @@ func main() {
 		if err != nil {
 			logrus.Fatalf("Error connecting to the database: %v", err)
 		}
-		// Handle error while closing the database connection
 		defer func() {
 			if err := db.Close(); err != nil {
 				logrus.Errorf("Error closing the database connection: %v", err)
 			}
 		}()
 
-		// Insert data into the database
-		insertRestaurants(100, false)
-		insertDiners(500, false)
+		// Create tables if they don't exist
+		createTables(db)
+
+		// Insert data into the tables
+		insertRestaurants(100, false, db)
+		insertDiners(500, false, db)
 	} else {
 		logrus.Warn("Please specify either --stdout, --initdb, --proper-name, or --restaurant-name.")
 	}
