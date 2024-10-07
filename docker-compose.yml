@@ -4,9 +4,11 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: myuser
-      POSTGRES_PASSWORD: mypassword
-      POSTGRES_DB: mydatabase
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    env_file:
+      - .env
     volumes:
       - db_data:/var/lib/postgresql/data
     ports:
@@ -17,10 +19,10 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      DATABASE_URL: postgres://myuser:mypassword@db:5432/mydatabase
+      DATABASE_URL: $(shell jq -r '"postgres://\(.database.user):\(.database.password)@\(.database.host):\(.database.port)/\(.database.dbname)?sslmode=disable"' config.json)
     depends_on:
       - db
-    command: /usr/local/bin/generate_data --initdb
+    command: /usr/local/bin/generate_data --initdb --config=config.json
 
 volumes:
   db_data:
