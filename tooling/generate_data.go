@@ -114,6 +114,8 @@ func main() {
 	stdout := flag.Bool("stdout", false, "Print SQL statements to stdout instead of executing")
 	initdb := flag.Bool("initdb", false, "Initialize the database with test data")
 	configFile := flag.String("config", "config.json", "Path to the config file")
+	properName := flag.Bool("proper-name", false, "Generate a random proper name")
+	restaurantName := flag.Bool("restaurant-name", false, "Generate a random restaurant name")
 	flag.Parse()
 
 	// Configure Logrus
@@ -121,6 +123,17 @@ func main() {
 		FullTimestamp: true,
 	})
 	logrus.SetLevel(logrus.InfoLevel)
+
+	// Handle the new fun flags
+	if *properName {
+		fmt.Println(RandomName(rng))
+		return
+	}
+
+	if *restaurantName {
+		fmt.Println(RandomRestaurantName(rng))
+		return
+	}
 
 	// Load configuration
 	config, err := loadConfig(*configFile)
@@ -153,6 +166,6 @@ func main() {
 		insertRestaurants(100, false)
 		insertDiners(500, false)
 	} else {
-		logrus.Warn("Please specify either --stdout or --initdb.")
+		logrus.Warn("Please specify either --stdout, --initdb, --proper-name, or --restaurant-name.")
 	}
 }
