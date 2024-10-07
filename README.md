@@ -21,7 +21,7 @@ given a set of restaurants with attributes:
         "kid-friendly",
         "paleo"
       ],
-      "location": [  // [ latitude, longitude ]
+      "location": [
         37.7749,
         -122.4194
       ]
@@ -37,7 +37,7 @@ and a set of diners with attributes:
   "diners": [
     {
       "name": "string",
-      "location": [  // [ latitude, longitude ]
+      "location": [
         37.7749,
         -122.4194
       ],
@@ -65,7 +65,7 @@ http.HandleFunc("/restaurant/available", func(w http.ResponseWriter, r *http.Req
 
 ```golang
 // restaurantBook reserves the correct number of tables at the given restaurant
-http.HandleFunc("/restaurant/available", func(w http.ResponseWriter, r *http.Request) {
+http.HandleFunc("/restaurant/book", func(w http.ResponseWriter, r *http.Request) {
     // reservations are assumed to be two hours
     startTime := r.URL.Query().Get("startTime")
     // how you implement this is up to you
