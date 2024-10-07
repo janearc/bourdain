@@ -22,12 +22,14 @@ var (
 	italianPhrases             = []string{"La Vita", "Il Gusto", "Osteria", "Bontà"}
 )
 
+// RandomName generates a random name using the provided random number generator
 func RandomName(rng *rand.Rand) string {
 	firstName := firstNames[rng.Intn(len(firstNames))]
 	lastName := lastNames[rng.Intn(len(lastNames))]
 	return fmt.Sprintf("%s %s", firstName, lastName)
 }
 
+// RandomRestaurantName generates a random restaurant name using the provided random number generator
 func RandomRestaurantName(rng *rand.Rand) string {
 	vibe := rng.Intn(3)
 	switch vibe {

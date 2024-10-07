@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
@@ -22,7 +20,7 @@ services:
       DATABASE_URL: $(shell jq -r '"postgres://\(.database.user):\(.database.password)@\(.database.host):\(.database.port)/\(.database.dbname)?sslmode=disable"' config.json)
     depends_on:
       - db
-    command: /usr/local/bin/generate_data --initdb --config=config.json
+    command: /usr/local/bin/generate_data --initdb --config=/config/config.json
 
 volumes:
   db_data:
