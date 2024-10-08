@@ -28,16 +28,18 @@ func ConnectDB(config *Config) (*sql.DB, error) {
 	return db, nil
 }
 
-// getDSN constructs the database connection string with escaped credentials
 func getDSN(config *Config) string {
+	logrus.Info("getDSN is being called") // This will crash the app to ensure it runs this code
 	escapedUser := url.QueryEscape(config.Database.User)
 	escapedPassword := url.QueryEscape(config.Database.Password)
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 		escapedUser,
 		escapedPassword,
 		config.Database.Host,
 		config.Database.Port,
 		config.Database.DbName)
+	logrus.Infof("Constructed DSN: %s", dsn)
+	return dsn
 }
 
 // FormatArrayForPostgres formats an array for PostgreSQL, escaping elements and wrapping them in curly braces

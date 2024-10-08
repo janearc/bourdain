@@ -6,6 +6,11 @@ generate-env:
 	echo "POSTGRES_PASSWORD=$(shell jq -r '.database.password' config.json)" >> .env
 	echo "POSTGRES_DB=$(shell jq -r '.database.dbname' config.json)" >> .env
 
+# Build the web_service binary
+buildWebService:
+	go env
+	go build -v -o web_service ./service
+
 # Build the Docker images for the app and Postgres
 build:
 	docker-compose build
@@ -37,7 +42,7 @@ testinit: build
 clean:
 	docker-compose down -v
 	docker-compose down --remove-orphans
-	rm checkAvailability
+	rm checkAvailability web_service
 
 # Generate random diner and restaurant names and print them
 names: build

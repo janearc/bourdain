@@ -17,6 +17,14 @@ import (
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func createDatabase(db *sql.DB) {
+	remoteDB, rderr := getCurrentDatabase(db)
+
+	if rderr != nil {
+		logrus.Fatalf("Error getting current database: %v", rderr)
+	} else {
+		logrus.Infof("[createdb] Current database: %s", remoteDB)
+	}
+
 	// Enable the uuid-ossp extension for generating UUIDs
 	_, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
 	if err != nil {
@@ -33,6 +41,14 @@ func createDatabase(db *sql.DB) {
 }
 
 func createTables(db *sql.DB) {
+	remoteDB, rderr := getCurrentDatabase(db)
+
+	if rderr != nil {
+		logrus.Fatalf("Error getting current database: %v", rderr)
+	} else {
+		logrus.Infof("[createtables] Current database: %s", remoteDB)
+	}
+
 	// Create diners table
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS diners (
@@ -190,6 +206,15 @@ func insertDiners(count int, stdout bool, db *sql.DB) {
 			}
 		}
 	}
+}
+
+func getCurrentDatabase(db *sql.DB) (string, error) {
+	var dbName string
+	err := db.QueryRow("SELECT current_database();").Scan(&dbName)
+	if err != nil {
+		return "", fmt.Errorf("error fetching current database: %v", err)
+	}
+	return dbName, nil
 }
 
 func main() {

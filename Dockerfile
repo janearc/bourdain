@@ -1,4 +1,4 @@
-# Stage 1: Build the Go applications
+# Stage 1: Build the Go application
 FROM golang:1.23-alpine AS build
 
 WORKDIR /app
@@ -13,24 +13,24 @@ RUN go mod download
 # Copy the entire source code into the container
 COPY . .
 
-# Build the Go application for generate_data
+# Build the Go application (web_service and generate_data)
+RUN go build -o /usr/local/bin/web_service ./service
+RUN go build -o /usr/local/bin/check_availability ./tooling/check_availability
 RUN go build -o /usr/local/bin/generate_data ./tooling/generate_data
 
-# Build the Go application for check_availability
-RUN go build -o /usr/local/bin/check_availability ./tooling/check_availability/check_availability.go
-
-# Stage 2: Final image with PostgreSQL and the Go applications
-FROM postgres:15-alpine
+# Stage 2: Run the Go application
+FROM alpine:latest
 
 # Copy the Go binaries from the previous stage
 COPY --from=build /usr/local/bin/generate_data /usr/local/bin/generate_data
 COPY --from=build /usr/local/bin/check_availability /usr/local/bin/check_availability
+COPY --from=build /usr/local/bin/web_service /usr/local/bin/web_service
 
 # Copy the config file to /config in the container
 COPY config.json /config/config.json
 
-# Expose the PostgreSQL port
-EXPOSE 5432
+# Expose the app port
+EXPOSE 8080
 
-# Default command to start PostgreSQL
-CMD ["docker-entrypoint.sh", "postgres"]
+# Set the entry point for the web service
+CMD ["/usr/local/bin/web_service"]

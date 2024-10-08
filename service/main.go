@@ -26,10 +26,11 @@ func main() {
 		}
 	}()
 
-	// Pass `db` explicitly to handlers
+	// Define HTTP handlers with closure to pass `db` into handlers
 	http.HandleFunc("/restaurant/available", func(w http.ResponseWriter, r *http.Request) {
 		restaurantAvailability(w, r, db)
 	})
+
 	http.HandleFunc("/restaurant/book", func(w http.ResponseWriter, r *http.Request) {
 		restaurantBook(w, r, db)
 	})

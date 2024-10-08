@@ -3,7 +3,7 @@ package core
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 )
 
 // Config structure for the database connection and server settings
@@ -22,10 +22,11 @@ type Config struct {
 
 // LoadConfig loads the configuration from a JSON file
 func LoadConfig(filename string) (*Config, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("could not read config file: %v", err)
 	}
+
 	var config Config
 	err = json.Unmarshal(data, &config)
 	if err != nil {
