@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -9,7 +10,7 @@ import (
 )
 
 // restaurantAvailability returns a list of restaurants that can accommodate the number of diners
-func restaurantAvailability(w http.ResponseWriter, r *http.Request) {
+func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// startTime := r.URL.Query().Get("startTime") // Not used in this basic example, but could be part of a reservations table
 	dinersStr := r.URL.Query().Get("diners")
 

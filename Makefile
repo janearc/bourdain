@@ -1,10 +1,9 @@
 # Define paths and flags
 SCRIPT_PATH=tooling
 
-# Create the .env file from config.json using jq
 generate-env:
 	echo "POSTGRES_USER=$(shell jq -r '.database.user' config.json)" > .env
-	echo "POSTGRES_PASSWORD='$(shell jq -r '.database.password' config.json)'" >> .env
+	echo "POSTGRES_PASSWORD=$(shell jq -r '.database.password' config.json)" >> .env
 	echo "POSTGRES_DB=$(shell jq -r '.database.dbname' config.json)" >> .env
 
 # Build the Docker images for the app and Postgres
@@ -38,9 +37,20 @@ testinit: build
 clean:
 	docker-compose down -v
 	docker-compose down --remove-orphans
+	rm checkAvailability
 
 # Generate random diner and restaurant names and print them
 names: build
 	@diner=$$(docker-compose run --rm app /usr/local/bin/generate_data --proper-name | tail -n 1) && \
 	restaurant=$$(docker-compose run --rm app /usr/local/bin/generate_data --restaurant-name | tail -n 1) && \
 	echo "$$diner requests a reservation at $$restaurant"
+
+# Build the checkAvailability binary
+checkAvailability:
+	go build -o checkAvailability ./tooling/check_availability
+
+# Run the checkAvailability binary and start the app if not running
+runCheckAvailability: checkAvailability
+	@docker-compose ps | grep app | grep "Up" > /dev/null || (echo "Starting app service..." && docker-compose up -d app)
+	@echo "Checking availability..."
+	./checkAvailability

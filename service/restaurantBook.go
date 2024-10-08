@@ -9,7 +9,7 @@ import (
 )
 
 // restaurantBook reserves a restaurant for the given number of diners
-func restaurantBook(w http.ResponseWriter, r *http.Request) {
+func restaurantBook(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// startTime := r.URL.Query().Get("startTime") // Can be used to track reservation time
 	dinersStr := r.URL.Query().Get("diners")
 	restaurant := r.URL.Query().Get("restaurant")

@@ -49,11 +49,13 @@ func createTables(db *sql.DB) {
 	// Create restaurants table
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS restaurants (
-			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-			name VARCHAR(255) NOT NULL,
-			capacity JSONB NOT NULL,
-			endorsements JSONB NOT NULL,
-			location GEOGRAPHY(POINT, 4326)
+		    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+		    name VARCHAR(255) NOT NULL,
+		    capacity JSONB NOT NULL,
+		    endorsements JSONB NOT NULL,
+		    location GEOGRAPHY(POINT, 4326),
+		    opening_time TIME NOT NULL,
+		    closing_time TIME NOT NULL
 		);
 	`)
 	if err != nil {
@@ -110,30 +112,44 @@ func insertRestaurants(count int, stdout bool, db *sql.DB) {
 		}
 		endors := randomEndorsements()
 
-		// Marshal capacity and endorsements to JSON (since these are JSONB fields)
+		// Marshal capacity and endorsements to JSON
 		capacityJSON, err := json.Marshal(capacity)
 		if err != nil {
 			logrus.Errorf("Error marshaling capacity JSON: %v", err)
 			continue
 		}
-
 		endorsJSON, err := json.Marshal(endors)
 		if err != nil {
 			logrus.Errorf("Error marshaling endorsements JSON: %v", err)
 			continue
 		}
 
+		// Randomly assign hours based on the given probabilities
+		var openingTime, closingTime string
+
+		// 10% chance of being a 24-hour restaurant
+		if rng.Float64() < 0.1 {
+			openingTime = "00:00"
+			closingTime = "23:59"
+		} else if rng.Float64() < 0.25 { // 25% chance of being open from 10am to 10pm
+			openingTime = "10:00"
+			closingTime = "22:00"
+		} else { // The rest will be dinner places (5:30pm to 11:30pm)
+			openingTime = "17:30"
+			closingTime = "23:30"
+		}
+
 		// Insert the restaurant and return the generated UUID
 		sqlStmt := `
-			INSERT INTO restaurants (name, capacity, endorsements, location)
-			VALUES ($1, $2::jsonb, $3::jsonb, ST_SetSRID(ST_MakePoint($4, $5), 4326))
+			INSERT INTO restaurants (name, capacity, endorsements, location, opening_time, closing_time)
+			VALUES ($1, $2::jsonb, $3::jsonb, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6, $7)
 			RETURNING id;`
 
 		if stdout || db == nil {
 			logrus.Infof("Would execute: %s", sqlStmt)
 		} else {
 			var id string
-			err := db.QueryRow(sqlStmt, name, string(capacityJSON), string(endorsJSON), lon, lat).Scan(&id)
+			err := db.QueryRow(sqlStmt, name, string(capacityJSON), string(endorsJSON), lon, lat, openingTime, closingTime).Scan(&id)
 			if err != nil {
 				logrus.Errorf("Error inserting restaurant: %v", err)
 			} else {

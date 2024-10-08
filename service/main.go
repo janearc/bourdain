@@ -1,15 +1,12 @@
 package main
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/janearc/bourdain/core"
 	"github.com/sirupsen/logrus"
 )
-
-var db *sql.DB
 
 func main() {
 	// Use absolute path for config since it's inside Docker
@@ -19,7 +16,7 @@ func main() {
 	}
 
 	// Connect to the database
-	db, err = core.ConnectDB(config)
+	db, err := core.ConnectDB(config)
 	if err != nil {
 		logrus.Fatalf("Could not connect to database: %v", err)
 	}
@@ -29,9 +26,13 @@ func main() {
 		}
 	}()
 
-	// Define HTTP handlers
-	http.HandleFunc("/restaurant/available", restaurantAvailability)
-	http.HandleFunc("/restaurant/book", restaurantBook)
+	// Pass `db` explicitly to handlers
+	http.HandleFunc("/restaurant/available", func(w http.ResponseWriter, r *http.Request) {
+		restaurantAvailability(w, r, db)
+	})
+	http.HandleFunc("/restaurant/book", func(w http.ResponseWriter, r *http.Request) {
+		restaurantBook(w, r, db)
+	})
 
 	// Start the web server using the port from config.json
 	port := strconv.Itoa(config.Server.Port)

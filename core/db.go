@@ -4,21 +4,22 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq" // PostgreSQL driver
+	"github.com/sirupsen/logrus"
 	"net/url"
 	"strings"
 )
 
-// ConnectDB establishes a connection to the PostgreSQL database
 func ConnectDB(config *Config) (*sql.DB, error) {
-	dsn := getDSN(config) // Use the centralized DSN function
+	dsn := getDSN(config)
 
-	// Connect to PostgreSQL
+	// Log the DSN for verification
+	logrus.Infof("Connecting to database with DSN: %s", dsn)
+
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("error connecting to database: %v", err)
 	}
 
-	// Check if the connection is working
 	err = db.Ping()
 	if err != nil {
 		return nil, fmt.Errorf("error pinging database: %v", err)
@@ -39,7 +40,7 @@ func getDSN(config *Config) string {
 		config.Database.DbName)
 }
 
-// formatArrayForPostgres formats an array for PostgreSQL, escaping elements and wrapping them in curly braces
+// FormatArrayForPostgres formats an array for PostgreSQL, escaping elements and wrapping them in curly braces
 func FormatArrayForPostgres(arr []string) string {
 	for i, elem := range arr {
 		arr[i] = fmt.Sprintf("\"%s\"", elem) // Escape elements with quotes

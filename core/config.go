@@ -20,7 +20,7 @@ type Config struct {
 	} `json:"server"`
 }
 
-// loadConfig loads the configuration from a JSON file
+// LoadConfig loads the configuration from a JSON file
 func LoadConfig(filename string) (*Config, error) {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
