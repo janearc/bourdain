@@ -5,5 +5,8 @@
     "dbname": "bookingsdb",
     "host": "db",
     "port": 5432
+  },
+  "server": {
+    "port": 8080
   }
 }

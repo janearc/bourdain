@@ -2,12 +2,10 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"github.com/janearc/bourdain/core"
 	"math/rand"
-	"net/url"
 	"strings"
 	"time"
 
@@ -17,16 +15,6 @@ import (
 
 // Initialize a local random generator
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
-
-type Config struct {
-	Database struct {
-		User     string `json:"user"`
-		Password string `json:"password"`
-		DbName   string `json:"dbname"`
-		Host     string `json:"host"`
-		Port     int    `json:"port"`
-	} `json:"database"`
-}
 
 func createTables(db *sql.DB) {
 	// Enable PostGIS extension
@@ -63,29 +51,6 @@ func createTables(db *sql.DB) {
 	}
 }
 
-func loadConfig(filename string) (*Config, error) {
-	data, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-	var config Config
-	err = json.Unmarshal(data, &config)
-	if err != nil {
-		return nil, err
-	}
-	return &config, nil
-}
-
-func getDSN(config *Config) string {
-	escapedUser := url.QueryEscape(config.Database.User)
-	escapedPassword := url.QueryEscape(config.Database.Password)
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		escapedUser,
-		escapedPassword,
-		config.Database.Host,
-		config.Database.Port,
-		config.Database.DbName)
-}
 func randomLocation() (float64, float64) {
 	latBounds := [2]float64{40.5774, 40.9176} // Rough latitude range for Manhattan, Brooklyn, Bronx
 	lonBounds := [2]float64{-74.15, -73.7004} // Rough longitude range
@@ -163,7 +128,7 @@ func main() {
 	// Flags to determine mode of operation
 	stdout := flag.Bool("stdout", false, "Print SQL statements to stdout instead of executing")
 	initdb := flag.Bool("initdb", false, "Initialize the database with test data")
-	configFile := flag.String("config", "config.json", "Path to the config file")
+	configFile := flag.String("config", "/config/config.json", "Path to the config file")
 	properName := flag.Bool("proper-name", false, "Generate a random proper name")
 	restaurantName := flag.Bool("restaurant-name", false, "Generate a random restaurant name")
 	flag.Parse()
@@ -174,7 +139,7 @@ func main() {
 	})
 	logrus.SetLevel(logrus.InfoLevel)
 
-	// Handle the new fun flags
+	// Handle the fun name generation flags
 	if *properName {
 		fmt.Println(RandomName(rng))
 		return
@@ -186,13 +151,21 @@ func main() {
 	}
 
 	// Load configuration
-	config, err := loadConfig(*configFile)
+	config, err := core.LoadConfig(*configFile)
 	if err != nil {
 		logrus.Fatalf("Error loading config: %v", err)
 	}
 
-	// Get the DSN from the configuration
-	dsn := getDSN(config)
+	// Connect to the database using core.ConnectDB, which now includes the DSN logic
+	db, err := core.ConnectDB(config)
+	if err != nil {
+		logrus.Fatalf("Error connecting to the database: %v", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			logrus.Errorf("Error closing the database connection: %v", err)
+		}
+	}()
 
 	if *stdout {
 		logrus.Info("Generating SQL statements...")
@@ -200,17 +173,6 @@ func main() {
 		insertDiners(500, true, nil)
 	} else if *initdb {
 		logrus.Info("Initializing database...")
-
-		// Connect to the database
-		db, err := sql.Open("postgres", dsn)
-		if err != nil {
-			logrus.Fatalf("Error connecting to the database: %v", err)
-		}
-		defer func() {
-			if err := db.Close(); err != nil {
-				logrus.Errorf("Error closing the database connection: %v", err)
-			}
-		}()
 
 		// Create tables if they don't exist
 		createTables(db)
