@@ -3,9 +3,9 @@ package core
 import (
 	"database/sql"
 	"fmt"
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"net/url"
-
-	_ "github.com/lib/pq" // Postgres driver
+	"strings"
 )
 
 // ConnectDB establishes a connection to the PostgreSQL database
@@ -37,4 +37,12 @@ func getDSN(config *Config) string {
 		config.Database.Host,
 		config.Database.Port,
 		config.Database.DbName)
+}
+
+// formatArrayForPostgres formats an array for PostgreSQL, escaping elements and wrapping them in curly braces
+func FormatArrayForPostgres(arr []string) string {
+	for i, elem := range arr {
+		arr[i] = fmt.Sprintf("\"%s\"", elem) // Escape elements with quotes
+	}
+	return fmt.Sprintf("{%s}", strings.Join(arr, ",")) // Wrap in curly braces
 }
