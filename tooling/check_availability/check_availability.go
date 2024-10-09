@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"time"
@@ -40,12 +40,15 @@ func checkAvailability(partySize int) {
 	}()
 
 	// Read and print the response
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		fmt.Printf("Error reading response: %v\n", err)
 		return
 	}
 	if resp.StatusCode == http.StatusOK {
+		// TODO: we're at the availability found part, so we need to:
+		//       start requesting availability with time
+		//       attempt to book & do the jenga stuff
 		fmt.Printf("Party of %d diners found availability: %s\n", partySize, string(body))
 	} else {
 		fmt.Printf("Party of %d diners found no availability\n", partySize)

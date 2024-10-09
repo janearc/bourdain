@@ -5,14 +5,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
-// restaurantAvailability returns a list of restaurants that can accommodate the number of diners
+// restaurantAvailability returns a list of restaurants that can accommodate the number of diners and are open during the specified time
 func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// startTime := r.URL.Query().Get("startTime") // Not used in this basic example, but could be part of a reservations table
+	// Retrieve query parameters from the URL
 	dinersStr := r.URL.Query().Get("diners")
+	startTimeStr := r.URL.Query().Get("startTime")
+	endTimeStr := r.URL.Query().Get("endTime")
 
 	// Convert the number of diners to an integer
 	diners, err := strconv.Atoi(dinersStr)
@@ -21,16 +24,31 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 		return
 	}
 
-	// Query to find restaurants that can accommodate the specified number of diners
+	// Convert the start and end times to a time.Time object
+	startTime, err := time.Parse("15:04", startTimeStr) // Using the "HH:mm" format
+	if err != nil {
+		http.Error(w, "Invalid start time", http.StatusBadRequest)
+		return
+	}
+
+	endTime, err := time.Parse("15:04", endTimeStr)
+	if err != nil {
+		http.Error(w, "Invalid end time", http.StatusBadRequest)
+		return
+	}
+
+	// SQL query to find restaurants that can accommodate the diners and are open during the specified time
 	query := `
 		SELECT name 
 		FROM restaurants 
 		WHERE 
 			(cast(capacity->>'two-top' as integer) * 2) +
 			(cast(capacity->>'four-top' as integer) * 4) +
-			(cast(capacity->>'six-top' as integer) * 6) >= $1;`
+			(cast(capacity->>'six-top' as integer) * 6) >= $1
+			AND opening_time <= $2
+			AND closing_time >= $3;`
 
-	rows, err := db.Query(query, diners)
+	rows, err := db.Query(query, diners, startTime.Format("15:04"), endTime.Format("15:04"))
 	if err != nil {
 		logrus.Errorf("Error querying restaurants: %v", err)
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
@@ -56,7 +74,7 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 
 	// Check if there are any available restaurants
 	if len(availableRestaurants) == 0 {
-		http.Error(w, "No restaurants available for the given number of diners", http.StatusNotFound)
+		http.Error(w, "No restaurants available for the given number of diners and time window", http.StatusNotFound)
 		return
 	}
 
