@@ -114,7 +114,33 @@ func randomEndorsements() []string {
 }
 
 func randomPreferences() []string {
-	return randomEndorsements()
+	allPreferences := Endorsements
+
+	// 25% chance to have no preferences at all
+	if rand.Float64() < 0.25 {
+		return []string{}
+	}
+
+	// 60% chance to have exactly one preference
+	if rand.Float64() < 0.60 {
+		return []string{allPreferences[rand.Intn(len(allPreferences))]}
+	}
+
+	// Only 15% chance to have two preferences
+	if rand.Float64() < 0.15 {
+		pref1 := allPreferences[rand.Intn(len(allPreferences))]
+		pref2 := allPreferences[rand.Intn(len(allPreferences))]
+		// Ensure the two preferences are distinct
+		for pref1 == pref2 {
+			pref2 = allPreferences[rand.Intn(len(allPreferences))]
+		}
+		return []string{pref1, pref2}
+	}
+
+	// Even rarer chance (5%) to have three or more preferences
+	numPrefs := rand.Intn(3) + 1 // Randomly pick 1 to 3 preferences
+	rand.Shuffle(len(allPreferences), func(i, j int) { allPreferences[i], allPreferences[j] = allPreferences[j], allPreferences[i] })
+	return allPreferences[:numPrefs]
 }
 
 func insertRestaurants(count int, stdout bool, db *sql.DB) {

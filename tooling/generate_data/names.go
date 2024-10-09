@@ -7,7 +7,7 @@ import (
 
 // Exported variables and functions
 var (
-	Endorsements               = []string{"gluten-free", "kid-friendly", "paleo", "vegan", "organic", "halal", "kosher"}
+	Endorsements               = []string{"gluten-free", "kid-friendly", "paleo", "vegan", "organic", "halal", "kosher", "pet-friendly", "molecular-gastronomy"}
 	firstNames                 = []string{"Chester", "Camden", "Harriet", "Olivia", "Arthur", "Eleanor", "Percival", "Jasper", "Florence", "Theodore", "Boris", "Natasha", "Rocky", "Bullwinkle"}
 	lastNames                  = []string{"Hackington", "Perspicacious", "Smith", "Wellington", "Crumble", "Burlington", "Peabody", "Fitzroy", "Wainwright", "Harrington"}
 	californiaAdjectives       = []string{"Sunny", "Fresh", "New", "Inverted", "Golden", "Crispy", "Hearty"}

@@ -11,6 +11,9 @@ import (
 func main() {
 	// Use absolute path for config since it's inside Docker
 	config, err := core.LoadConfig("/config/config.json")
+
+	logrus.SetLevel(logrus.InfoLevel)
+
 	if err != nil {
 		logrus.Fatalf("Could not load config: %v", err)
 	}

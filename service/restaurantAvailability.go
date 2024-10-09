@@ -25,6 +25,7 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 
 	// Fetch endorsements for all diners using the PL/pgSQL function
 	var dinerEndorsements []string
+	logrus.Infof("Fetching endorsements for party UUIDs: %v", dinerUUIDs)
 	query := `SELECT endorsement FROM get_diner_endorsements($1)`
 	rows, err := db.Query(query, pq.Array(dinerUUIDs))
 	if err != nil {
