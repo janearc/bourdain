@@ -274,6 +274,9 @@ func main() {
 		// Create tables if they don't exist
 		createTables(db)
 
+		// Create the helper functions
+		createPlSqlFunctions(db)
+
 		// Insert data into the tables
 		insertRestaurants(100, false, db)
 		insertDiners(500, false, db)

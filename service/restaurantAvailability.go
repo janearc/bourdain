@@ -3,64 +3,67 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
-	"time"
-
-	"github.com/sirupsen/logrus"
+	"strings"
 )
 
 // restaurantAvailability returns a list of restaurants that can accommodate the number of diners and are open during the specified time
 func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) {
-	// Retrieve query parameters from the URL
 	dinersStr := r.URL.Query().Get("diners")
-	startTimeStr := r.URL.Query().Get("startTime")
-	endTimeStr := r.URL.Query().Get("endTime")
+	dinersUUIDStr := r.URL.Query().Get("dinersUUID")
 
-	// Convert the number of diners to an integer
+	// Convert the diners and UUIDs into a format we can work with
 	diners, err := strconv.Atoi(dinersStr)
 	if err != nil || diners <= 0 {
 		http.Error(w, "Invalid number of diners", http.StatusBadRequest)
 		return
 	}
+	dinerUUIDs := strings.Split(dinersUUIDStr, ",")
 
-	// Convert the start and end times to a time.Time object
-	startTime, err := time.Parse("15:04", startTimeStr) // Using the "HH:mm" format
+	// Fetch endorsements for all diners using the PL/pgSQL function
+	var dinerEndorsements []string
+	query := `SELECT endorsement FROM get_diner_endorsements($1)`
+	rows, err := db.Query(query, pq.Array(dinerUUIDs))
 	if err != nil {
-		http.Error(w, "Invalid start time", http.StatusBadRequest)
+		logrus.Errorf("Error fetching diner endorsements: %v", err)
+		http.Error(w, "Error querying database", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var endorsement string
+		if err := rows.Scan(&endorsement); err != nil {
+			logrus.Errorf("Error scanning endorsement: %v", err)
+			http.Error(w, "Error scanning result", http.StatusInternalServerError)
+			return
+		}
+		dinerEndorsements = append(dinerEndorsements, endorsement)
+	}
+
+	// Filter restaurants based on diner endorsements
+	query = "SELECT * FROM check_restaurant_availability($1, $2::jsonb);"
+
+	// Convert endorsements to JSONB
+	endorsementsJSON, err := json.Marshal(dinerEndorsements)
+	if err != nil {
+		logrus.Errorf("Error marshaling endorsements JSON: %v", err)
+		http.Error(w, "Error encoding endorsements", http.StatusInternalServerError)
 		return
 	}
 
-	endTime, err := time.Parse("15:04", endTimeStr)
-	if err != nil {
-		http.Error(w, "Invalid end time", http.StatusBadRequest)
-		return
-	}
-
-	// SQL query to find restaurants that can accommodate the diners and are open during the specified time
-	query := `
-		SELECT name 
-		FROM restaurants 
-		WHERE 
-			(cast(capacity->>'two-top' as integer) * 2) +
-			(cast(capacity->>'four-top' as integer) * 4) +
-			(cast(capacity->>'six-top' as integer) * 6) >= $1
-			AND opening_time <= $2
-			AND closing_time >= $3;`
-
-	rows, err := db.Query(query, diners, startTime.Format("15:04"), endTime.Format("15:04"))
+	// Query restaurants based on diner size and endorsements
+	rows, err = db.Query(query, diners, endorsementsJSON)
 	if err != nil {
 		logrus.Errorf("Error querying restaurants: %v", err)
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
 		return
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			logrus.Errorf("Error closing rows: %v", err)
-		}
-	}()
+	defer rows.Close()
 
-	// Collect the results
 	var availableRestaurants []string
 	for rows.Next() {
 		var name string
@@ -72,13 +75,11 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 		availableRestaurants = append(availableRestaurants, name)
 	}
 
-	// Check if there are any available restaurants
 	if len(availableRestaurants) == 0 {
-		http.Error(w, "No restaurants available for the given number of diners and time window", http.StatusNotFound)
+		http.Error(w, "No restaurants available for the given number of diners", http.StatusNotFound)
 		return
 	}
 
-	// Return the available restaurants as JSON
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(availableRestaurants); err != nil {
 		logrus.Errorf("Error encoding response: %v", err)

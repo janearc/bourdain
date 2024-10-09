@@ -52,7 +52,24 @@ func createPlSqlFunctions(db *sql.DB) {
 		logrus.Fatalf("Error creating available_restaurants function: %v", endErr)
 	}
 
-	logrus.Info("Function available_restaurants created successfully")
+	// create the distinct endorsements function
+	_, bpErr := db.Exec(`
+		CREATE OR REPLACE FUNCTION generate_party(party_size INT)
+		RETURNS TABLE(diner_id UUID) AS $$
+		BEGIN
+			RETURN QUERY
+			SELECT id
+			FROM diners
+			ORDER BY random()
+			LIMIT party_size;
+		END;
+		$$ LANGUAGE plpgsql;`)
+
+	if bpErr != nil {
+		logrus.Fatalf("Error creating generate_party function: %v", endErr)
+	}
+
+	logrus.Info("Function generate_party created successfully")
 
 	return
 }

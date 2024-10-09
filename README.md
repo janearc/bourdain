@@ -78,3 +78,5 @@ http.HandleFunc("/restaurant/book", func(w http.ResponseWriter, r *http.Request)
 Only API is in scope; UI is out of scope. You may use a database. The solution does not need to be publicly deployed
 but should be developed in a manner consistent with production code. Language is your choice but please do not use
 befunge.
+
+Solution is in this directory in SOLUTION.md

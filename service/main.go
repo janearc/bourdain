@@ -35,6 +35,17 @@ func main() {
 		restaurantBook(w, r, db)
 	})
 
+	// these are private functions which are required for keeping "solution"
+	// code out of golang. essentially, the tool that validates the http endpoints
+	// feels to me to be "cheating" to have database calls in it. so while it kind
+	// of breaks the idea of a "reservation booking system" to have "party building logic"
+	// etc in the database, for purposes of having a solution that cleanly addresses
+	// the presented problem (build http endpoints), it is the right design choice.
+
+	http.HandleFunc("/private/build_party", func(w http.ResponseWriter, r *http.Request) {
+		buildParty(w, r, db)
+	})
+
 	// Start the web server using the port from config.json
 	port := strconv.Itoa(config.Server.Port)
 	logrus.Infof("Server starting on port %s", port)
