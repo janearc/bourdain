@@ -40,6 +40,9 @@ applogs:
 dblogs:
 	docker logs `docker ps | grep gis | grep Up | cut -d ' ' -f 1`
 
+dbshell:
+	docker exec -it `docker ps | grep gis | grep healthy | cut -d ' ' -f 1` /bin/bash
+
 verify-db:
 	@echo "Verifying database schema..."
 	docker-compose exec db psql -U $(shell jq -r '.database.user' config.json) -d $(shell jq -r '.database.dbname' config.json) -c "\dt" | grep -q "restaurants" && echo "Database is healthy and schema is present." || (echo "Database verification failed." && exit 1)
@@ -71,3 +74,6 @@ runCheckAvailability: checkAvailability
 	./checkAvailability
 
 checks: clean build initdb runCheckAvailability
+
+stats:
+	wc -l `find . -type f | grep -v .git | grep -v .idea | grep -vE 'go.(sum|mod)' | grep -v '.md' | grep -v '.env'`

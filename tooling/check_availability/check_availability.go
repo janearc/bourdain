@@ -1,13 +1,13 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"io"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -50,13 +50,18 @@ func randomReservationTime() (time.Time, time.Time) {
 
 // Hit the availability endpoint with the party size and random reservation time
 func checkAvailability(partySize int, dinerUUIDs []string, startTime, endTime time.Time) error {
-	url := fmt.Sprintf("http://localhost:8080/restaurant/available?diners=%d&start=%s&end=%s",
-		partySize, startTime.Format("15:04"), endTime.Format("15:04"))
+	// Join the diner UUIDs for the URL query string
+	dinerUUIDStr := strings.Join(dinerUUIDs, ",")
+	url := fmt.Sprintf("http://localhost:8080/restaurant/available?diners=%d&start=%s&end=%s&dinerUUIDs=%s",
+		partySize, startTime.Format("15:04"), endTime.Format("15:04"), dinerUUIDStr)
 
-	// Optionally, we can include diner UUIDs as well if necessary
-	// You might want to encode them in the URL or pass them in the request body as JSON
+	// Log the request URL before making the HTTP request
+	logrus.Infof("Sending request to availability endpoint: %s", url)
+
+	// Make the HTTP GET request to the availability endpoint
 	resp, err := http.Get(url)
 	if err != nil {
+		logrus.Errorf("Error hitting availability endpoint: %v", err)
 		return fmt.Errorf("error hitting availability endpoint: %v", err)
 	}
 	defer func() {
@@ -65,78 +70,32 @@ func checkAvailability(partySize int, dinerUUIDs []string, startTime, endTime ti
 		}
 	}()
 
-	// Read and print the response
+	// Log the status code of the response
+	logrus.Infof("Received response with status code: %d", resp.StatusCode)
+
+	// Read the response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		logrus.Errorf("Error reading response body: %v", err)
 		return fmt.Errorf("error reading response: %v", err)
 	}
 
+	// Log the raw response body for debugging
+	logrus.Infof("Raw response body: %s", string(body))
+
+	// Handle the response based on the status code
 	if resp.StatusCode == http.StatusOK {
 		logrus.Infof("Party of %d diners found availability: %s", partySize, string(body))
+	} else if resp.StatusCode == http.StatusInternalServerError {
+		logrus.Errorf("Server error (500) while checking availability for party of %d diners: %s", partySize, string(body))
+	} else if resp.StatusCode == http.StatusBadRequest {
+		logrus.Errorf("Bad request (400) for party of %d diners: %s", partySize, string(body))
 	} else {
-		logrus.Infof("Party of %d diners found no availability", partySize)
+		logrus.Warnf("Unexpected status code %d for party of %d diners: %s", resp.StatusCode, partySize, string(body))
 	}
 
+	// Return nil if everything went fine
 	return nil
-}
-
-func findAvailableRestaurantsWithTime(partySize int, endorsements string, startTime, endTime time.Time, db *sql.DB) ([]string, error) {
-	query := `
-		SELECT name 
-		FROM find_available_restaurants($1, $2::jsonb)
-		WHERE opening_time <= $3::time 
-		AND closing_time >= $4::time;`
-
-	// Execute the query
-	rows, err := db.Query(query, partySize, endorsements, startTime, endTime)
-	if err != nil {
-		return nil, fmt.Errorf("error querying database for availability: %v", err)
-	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			logrus.Errorf("Error closing rows: %v", err)
-		}
-	}()
-
-	// Collect results
-	var availableRestaurants []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, fmt.Errorf("error scanning result: %v", err)
-		}
-		availableRestaurants = append(availableRestaurants, name)
-	}
-
-	// Check if any restaurants were found
-	if len(availableRestaurants) == 0 {
-		return nil, nil
-	}
-
-	return availableRestaurants, nil
-}
-
-func findAvailableRestaurants(partySize int, endorsements string, db *sql.DB) ([]string, error) {
-	query := `
-		SELECT name
-		FROM find_available_restaurants($1, $2);`
-
-	rows, err := db.Query(query, partySize, endorsements)
-	if err != nil {
-		return nil, fmt.Errorf("Error querying restaurants: %v", err)
-	}
-	defer rows.Close()
-
-	var availableRestaurants []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, fmt.Errorf("Error scanning restaurant name: %v", err)
-		}
-		availableRestaurants = append(availableRestaurants, name)
-	}
-
-	return availableRestaurants, nil
 }
 
 // create a hypothetical party that we're going to use to assess availability

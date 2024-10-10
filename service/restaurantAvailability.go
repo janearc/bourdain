@@ -15,9 +15,9 @@ import (
 func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Get query parameters
 	dinersStr := r.URL.Query().Get("diners")
-	dinersUUIDStr := r.URL.Query().Get("dinersUUID")
-	startTimeStr := r.URL.Query().Get("startTime")
-	endTimeStr := r.URL.Query().Get("endTime")
+	dinersUUIDStr := r.URL.Query().Get("dinerUUIDs")
+	startTimeStr := r.URL.Query().Get("start")
+	endTimeStr := r.URL.Query().Get("end")
 
 	// Convert parameters to usable types
 	diners, err := strconv.Atoi(dinersStr)
@@ -26,16 +26,29 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 		return
 	}
 	dinerUUIDs := strings.Split(dinersUUIDStr, ",")
-	startTime, err := time.Parse(time.RFC3339, startTimeStr)
+	// Log the raw query parameters
+	logrus.Infof("Received start time: %s, end time: %s", startTimeStr, endTimeStr)
+
+	startTime, err := time.Parse("15:04", startTimeStr)
 	if err != nil {
+		logrus.Errorf("Error parsing start time: %v", err)
 		http.Error(w, "Invalid start time", http.StatusBadRequest)
 		return
 	}
-	endTime, err := time.Parse(time.RFC3339, endTimeStr)
+	endTime, err := time.Parse("15:04", endTimeStr)
 	if err != nil {
 		http.Error(w, "Invalid end time", http.StatusBadRequest)
 		return
 	}
+
+	// Add validation for UUIDs
+	if len(dinerUUIDs) == 0 || dinerUUIDs[0] == "" {
+		http.Error(w, "No valid UUIDs provided", http.StatusBadRequest)
+		return
+	}
+
+	// Logging to help debug any potential issues
+	logrus.Infof("Diners: %d, UUIDs: %v, Start: %v, End: %v", diners, dinerUUIDs, startTime, endTime)
 
 	// Execute the SQL query
 	query := "SELECT * FROM check_restaurant_availability($1, $2::uuid[], $3, $4);"
@@ -45,7 +58,11 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logrus.Errorf("Error closing rows: %v", err)
+		}
+	}()
 
 	// Collect results
 	var availableRestaurants []string
@@ -57,6 +74,12 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 			return
 		}
 		availableRestaurants = append(availableRestaurants, name)
+	}
+
+	// Check if any restaurants were found
+	if len(availableRestaurants) == 0 {
+		http.Error(w, "No restaurants available for the given parameters", http.StatusNotFound)
+		return
 	}
 
 	// Return the results as JSON

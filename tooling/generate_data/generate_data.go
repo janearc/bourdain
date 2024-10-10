@@ -37,6 +37,17 @@ func createDatabase(db *sql.DB) {
 		logrus.Fatalf("Error creating PostGIS extension: %v", err)
 	}
 
+	// set logging to horrifying
+	_, err = db.Exec(`ALTER DATABASE ` + remoteDB + ` SET log_statement = 'all';`)
+	if err != nil {
+		logrus.Fatalf("Error setting log_statement: %v", err)
+	}
+
+	_, err = db.Exec("ALTER SYSTEM SET client_min_messages TO 'NOTICE';")
+	if err != nil {
+		logrus.Fatalf("Error setting client_min_messages: %v", err)
+	}
+
 	logrus.Info("Database extensions and setup complete")
 }
 
