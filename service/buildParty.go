@@ -19,6 +19,8 @@ func buildParty(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 
+	logrus.Infof("Building party of size %d", partySize)
+
 	// Call the `generate_party` function in the database
 	query := `SELECT diner_id FROM generate_party($1)`
 	rows, err := db.Query(query, partySize)
@@ -44,6 +46,8 @@ func buildParty(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		}
 		dinerUUIDs = append(dinerUUIDs, dinerID)
 	}
+
+	logrus.Info("party assembled.")
 
 	// Return the party UUIDs as JSON
 	w.Header().Set("Content-Type", "application/json")

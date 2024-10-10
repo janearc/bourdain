@@ -28,19 +28,22 @@ func generatePartySize() int {
 	}
 }
 
-// randomReservationTime generates a random start time and end time for a reservation, in 15-minute increments
+// randomReservationTime generates a random start and end time for a reservation, in 15-minute increments
 func randomReservationTime() (time.Time, time.Time) {
-	// Define the earliest and latest possible times (10:00 AM to 10:00 PM for example)
-	openTime := time.Date(0, 0, 0, 10, 0, 0, 0, time.UTC)
-	closeTime := time.Date(0, 0, 0, 22, 0, 0, 0, time.UTC)
+	// Generate a random time during the day in 15-minute intervals
+	startHour := rand.Intn(24)       // 0 to 23 hours
+	startMinute := rand.Intn(4) * 15 // 0, 15, 30, or 45 minutes
 
-	// Generate a random number of 15-minute intervals between the open and close time
-	totalMinutes := int(closeTime.Sub(openTime).Minutes())
-	randomMinutes := rand.Intn(totalMinutes/15) * 15
+	// Create a start time based on the random hour and minute
+	startTime := time.Date(0, 0, 0, startHour, startMinute, 0, 0, time.UTC)
 
-	// Calculate start and end time based on the random interval
-	startTime := openTime.Add(time.Duration(randomMinutes) * time.Minute)
-	endTime := startTime.Add(45 * time.Minute) // Assume a 45-minute dining period
+	// Set the minimum and maximum dining duration (30 to 120 minutes)
+	minDuration := 30
+	maxDuration := 120
+	randomDurationMinutes := rand.Intn((maxDuration-minDuration)/15+1)*15 + minDuration
+
+	// Calculate the end time based on the random duration
+	endTime := startTime.Add(time.Duration(randomDurationMinutes) * time.Minute)
 
 	return startTime, endTime
 }

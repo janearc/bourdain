@@ -194,8 +194,6 @@ func insertRestaurants(count int, stdout bool, db *sql.DB) {
 			err := db.QueryRow(sqlStmt, name, string(capacityJSON), string(endorsJSON), lon, lat, openingTime, closingTime).Scan(&id)
 			if err != nil {
 				logrus.Errorf("Error inserting restaurant: %v", err)
-			} else {
-				logrus.Infof("Inserted restaurant with UUID: %s", id)
 			}
 		}
 	}
@@ -227,8 +225,6 @@ func insertDiners(count int, stdout bool, db *sql.DB) {
 			err := db.QueryRow(sqlStmt, name, string(prefsJSON), lon, lat).Scan(&id)
 			if err != nil {
 				logrus.Errorf("Error inserting diner: %v", err)
-			} else {
-				logrus.Infof("Inserted diner with UUID: %s", id)
 			}
 		}
 	}
@@ -289,8 +285,8 @@ func main() {
 	if *stdout {
 		// Generate and print SQL statements instead of inserting into DB
 		logrus.Info("Generating SQL statements for restaurants and diners...")
-		insertRestaurants(100, true, nil)
-		insertDiners(500, true, nil)
+		insertRestaurants(10, true, nil)
+		insertDiners(10, true, nil)
 	} else if *initdb {
 		logrus.Info("Initializing database...")
 
@@ -304,8 +300,8 @@ func main() {
 		createPlSqlFunctions(db)
 
 		// Insert data into the tables
-		insertRestaurants(100, false, db)
-		insertDiners(500, false, db)
+		insertRestaurants(50000, false, db)
+		insertDiners(150, false, db)
 
 		logrus.Info("Database initialized successfully with sample data.")
 	} else {

@@ -30,6 +30,16 @@ initdb: build
 	# Run the app container to insert data into the running db container
 	docker-compose run --rm app /usr/local/bin/generate_data --initdb --config=/config/config.json
 
+# testing/debugging 
+psql:
+	docker exec -it `docker ps | grep gis | grep healthy | cut -d ' ' -f 1` psql -U bourdain -d bookingsdb
+
+applogs:
+	docker logs `docker ps | grep bourdain-app | grep Up | cut -d ' ' -f 1`
+
+dblogs:
+	docker logs `docker ps | grep gis | grep Up | cut -d ' ' -f 1`
+
 verify-db:
 	@echo "Verifying database schema..."
 	docker-compose exec db psql -U $(shell jq -r '.database.user' config.json) -d $(shell jq -r '.database.dbname' config.json) -c "\dt" | grep -q "restaurants" && echo "Database is healthy and schema is present." || (echo "Database verification failed." && exit 1)
@@ -42,7 +52,7 @@ testinit: build
 clean:
 	docker-compose down -v
 	docker-compose down --remove-orphans
-	rm checkAvailability web_service
+	rm -f checkAvailability web_service
 
 # Generate random diner and restaurant names and print them
 names: build
@@ -59,3 +69,5 @@ runCheckAvailability: checkAvailability
 	@docker-compose ps | grep app | grep "Up" > /dev/null || (echo "Starting app service..." && docker-compose up -d app)
 	@echo "Checking availability..."
 	./checkAvailability
+
+checks: clean build initdb runCheckAvailability

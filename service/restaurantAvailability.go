@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"net/http"
@@ -23,17 +24,34 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 	}
 	dinerUUIDs := strings.Split(dinersUUIDStr, ",")
 
+	// Filter out any empty or invalid UUID strings
+	validUUIDs := []string{}
+	for _, uuidStr := range dinerUUIDs {
+		if _, err := uuid.Parse(uuidStr); err == nil && uuidStr != "" {
+			validUUIDs = append(validUUIDs, uuidStr)
+		}
+	}
+
+	if len(validUUIDs) == 0 {
+		http.Error(w, "Invalid or missing UUIDs", http.StatusBadRequest)
+		return
+	}
+
 	// Fetch endorsements for all diners using the PL/pgSQL function
 	var dinerEndorsements []string
 	logrus.Infof("Fetching endorsements for party UUIDs: %v", dinerUUIDs)
-	query := `SELECT endorsement FROM get_diner_endorsements($1)`
+	query := `SELECT endorsement FROM get_diner_endorsements($1::uuid[])`
 	rows, err := db.Query(query, pq.Array(dinerUUIDs))
 	if err != nil {
 		logrus.Errorf("Error fetching diner endorsements: %v", err)
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logrus.Errorf("Error closing rows: %v", err)
+		}
+	}()
 
 	for rows.Next() {
 		var endorsement string
@@ -44,6 +62,8 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 		}
 		dinerEndorsements = append(dinerEndorsements, endorsement)
 	}
+
+	logrus.Infof("Party of %d diners with endorsements: %v", len(validUUIDs), dinerEndorsements)
 
 	// Filter restaurants based on diner endorsements
 	query = "SELECT * FROM check_restaurant_availability($1, $2::jsonb);"
@@ -63,7 +83,12 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
 		return
 	}
-	defer rows.Close()
+
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logrus.Errorf("Error closing rows: %v", err)
+		}
+	}()
 
 	var availableRestaurants []string
 	for rows.Next() {

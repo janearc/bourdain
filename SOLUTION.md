@@ -11,9 +11,16 @@ environment on your build machine.
 After you have initialized the database and fed it some data, you can then
 run the "solution" with `make runCheckAvailability`.
 
+(to just do all the things: `make clean build initdb runCheckAvailability`)
+
 # goodies
 
 You can run `make names` to see the example names which are honestly hilarious.
+
+Assorted things are available for poking around:
+* `make dblogs`
+* `make applogs`
+* `make psql`
 
 # design overview
 

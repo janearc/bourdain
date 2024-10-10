@@ -34,19 +34,19 @@ func createPlSqlFunctions(db *sql.DB) {
 
 	// create the distinct endorsements function
 	_, arErr := db.Exec(`
-		CREATE OR REPLACE FUNCTION find_available_restaurants(party_size int, endorsements jsonb)
-		RETURNS TABLE(name text) AS $$
-		BEGIN
-		  RETURN QUERY
-			SELECT name
-			FROM restaurants
-			WHERE 
-			  (cast(capacity->>'two-top' as integer) * 2) +
-			  (cast(capacity->>'four-top' as integer) * 4) +
-			  (cast(capacity->>'six-top' as integer) * 6) >= party_size
-			AND endorsements @> endorsements;
-		END;
-		$$ LANGUAGE plpgsql;`)
+			CREATE OR REPLACE FUNCTION find_available_restaurants(party_size int, diner_endorsements jsonb)
+			RETURNS TABLE(restaurant_name text) AS $$
+			BEGIN
+			  RETURN QUERY
+				SELECT r.name
+				FROM restaurants r
+				WHERE 
+				  (cast(r.capacity->>'two-top' as integer) * 2) +
+				  (cast(r.capacity->>'four-top' as integer) * 4) +
+				  (cast(r.capacity->>'six-top' as integer) * 6) >= party_size
+				AND r.endorsements @> diner_endorsements;
+			END;
+			$$ LANGUAGE plpgsql;`)
 
 	if arErr != nil {
 		logrus.Fatalf("Error creating available_restaurants function: %v", endErr)
@@ -70,6 +70,30 @@ func createPlSqlFunctions(db *sql.DB) {
 	}
 
 	logrus.Info("Function generate_party created successfully")
+
+	// this is a test function to verify from psql that the logic works in
+	// the db, regardless of what golang thinks of that
+
+	_, tpErr := db.Exec(`
+		CREATE OR REPLACE FUNCTION test_party_availability(party_size int)
+		RETURNS TABLE(restaurant_name text) AS $$
+		BEGIN
+		  RETURN QUERY
+			SELECT * 
+			FROM find_available_restaurants(
+			  party_size,
+			  (SELECT jsonb_agg(endorsement) FROM get_diner_endorsements(
+				  (SELECT ARRAY(SELECT * FROM generate_party(party_size)))
+			  ))
+			);
+		END;
+		$$ LANGUAGE plpgsql;`)
+
+	if tpErr != nil {
+		logrus.Fatalf("Error creating test_party_availability function: %v", tpErr)
+	}
+
+	logrus.Info("Function test_party_availability created successfully")
 
 	return
 }
