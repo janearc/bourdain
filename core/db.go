@@ -6,7 +6,8 @@ import (
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/sirupsen/logrus"
 	"net/url"
-	"strings"
+	"os"
+	"path/filepath"
 )
 
 func ConnectDB(config *Config) (*sql.DB, error) {
@@ -42,10 +43,21 @@ func getDSN(config *Config) string {
 	return dsn
 }
 
-// FormatArrayForPostgres formats an array for PostgreSQL, escaping elements and wrapping them in curly braces
-func FormatArrayForPostgres(arr []string) string {
-	for i, elem := range arr {
-		arr[i] = fmt.Sprintf("\"%s\"", elem) // Escape elements with quotes
+// LoadSQLFile loads a SQL file from the tooling/queries directory
+func LoadSQLFile(queryName string) (string, error) {
+	filePath := filepath.Join("tooling", "queries", queryName)
+	sqlBytes, err := os.ReadFile(filepath.Clean(filePath)) // Use os.ReadFile instead of ioutil.ReadFile
+	if err != nil {
+		return "", err
 	}
-	return fmt.Sprintf("{%s}", strings.Join(arr, ",")) // Wrap in curly braces
+	return string(sqlBytes), nil
+}
+
+// ExecSQLFromFile executes a SQL file from the queries directory (when expecting no rows)
+func ExecSQLFromFile(db *sql.DB, queryName string, args ...interface{}) (sql.Result, error) {
+	sqlQuery, err := LoadSQLFile(queryName)
+	if err != nil {
+		return nil, err
+	}
+	return db.Exec(sqlQuery, args...)
 }

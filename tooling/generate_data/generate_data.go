@@ -17,16 +17,16 @@ import (
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 func createDatabase(db *sql.DB) {
-	remoteDB, rderr := getCurrentDatabase(db)
+	remoteDB, err := getCurrentDatabase(db)
 
-	if rderr != nil {
-		logrus.Fatalf("Error getting current database: %v", rderr)
+	if err != nil {
+		logrus.Fatalf("Error getting current database: %v", err)
 	} else {
 		logrus.Infof("[createdb] Current database: %s", remoteDB)
 	}
 
 	// Enable the uuid-ossp extension for generating UUIDs
-	_, err := db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
+	_, err = db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
 	if err != nil {
 		logrus.Fatalf("Error creating uuid-ossp extension: %v", err)
 	}
@@ -38,61 +38,6 @@ func createDatabase(db *sql.DB) {
 	}
 
 	logrus.Info("Database extensions and setup complete")
-}
-
-func createTables(db *sql.DB) {
-	remoteDB, rderr := getCurrentDatabase(db)
-
-	if rderr != nil {
-		logrus.Fatalf("Error getting current database: %v", rderr)
-	} else {
-		logrus.Infof("[createtables] Current database: %s", remoteDB)
-	}
-
-	// Create diners table
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS diners (
-			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-			name VARCHAR(255) NOT NULL,
-			preferences JSONB NOT NULL,
-			location GEOGRAPHY(POINT, 4326)
-		);
-	`)
-	if err != nil {
-		logrus.Fatalf("Error creating diners table: %v", err)
-	}
-
-	// Create restaurants table
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS restaurants (
-		    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-		    name VARCHAR(255) NOT NULL,
-		    capacity JSONB NOT NULL,
-		    endorsements JSONB NOT NULL,
-		    location GEOGRAPHY(POINT, 4326),
-		    opening_time TIME NOT NULL,
-		    closing_time TIME NOT NULL
-		);
-	`)
-	if err != nil {
-		logrus.Fatalf("Error creating restaurants table: %v", err)
-	}
-
-	// Create reservations table
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS reservations (
-			id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-			restaurant_id UUID REFERENCES restaurants(id),
-			diner_id UUID REFERENCES diners(id),
-			reservation_time TIMESTAMP NOT NULL,
-			num_diners INTEGER NOT NULL
-		);
-	`)
-	if err != nil {
-		logrus.Fatalf("Error creating reservations table: %v", err)
-	}
-
-	logrus.Info("Tables created successfully")
 }
 
 func randomLocation() (float64, float64) {
@@ -114,7 +59,15 @@ func randomEndorsements() []string {
 }
 
 func randomPreferences() []string {
-	allPreferences := Endorsements
+	// Create a slice of preferences based on the weights
+	allPreferences := make([]string, 0, len(endorsementWeights))
+	for pref, weight := range endorsementWeights {
+		// Add preference to the list multiple times based on its weight
+		count := int(weight * 100) // Adjust weight scaling as needed
+		for i := 0; i < count; i++ {
+			allPreferences = append(allPreferences, pref)
+		}
+	}
 
 	// 25% chance to have no preferences at all
 	if rand.Float64() < 0.25 {
@@ -293,11 +246,8 @@ func main() {
 		// Create the database extensions (UUID, PostGIS)
 		createDatabase(db)
 
-		// Create tables if they don't exist
-		createTables(db)
-
-		// Create the helper functions
-		createPlSqlFunctions(db)
+		// build the schema
+		buildSchema(db)
 
 		// Insert data into the tables
 		insertRestaurants(50000, false, db)

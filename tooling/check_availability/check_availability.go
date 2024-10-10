@@ -14,17 +14,17 @@ import (
 // Create a new random source and generator
 var carng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-// Generates a random number of diners for a party (between 2 and 24)
-// Larger parties (greater than 10) will be rare
+// Generates a random number of diners for a party with adjusted distribution
+// 10 parties of 2-4, one party of 6, and one party of 10
 func generatePartySize() int {
 	r := carng.Float64()
 	switch {
-	case r < 0.7: // 70% chance for small parties (2-6 diners)
-		return carng.Intn(5) + 2
-	case r < 0.95: // 25% chance for medium parties (7-10 diners)
-		return carng.Intn(4) + 7
-	default: // 5% chance for large parties (11-24 diners)
-		return carng.Intn(14) + 11
+	case r < 0.9: // 90% chance for small parties (2-4 diners)
+		return carng.Intn(3) + 2
+	case r < 0.975: // 7.5% chance for a party of 6
+		return 6
+	default: // 2.5% chance for a party of 10
+		return 10
 	}
 }
 
@@ -174,7 +174,7 @@ func buildParty(partySize int) ([]string, error) {
 }
 
 func main() {
-	for i := 1; i <= 5; i++ {
+	for i := 1; i <= 10; i++ {
 		// Build a random party and generate a random reservation time
 		dinerUUIDs, err := buildParty(generatePartySize())
 		if err != nil {
