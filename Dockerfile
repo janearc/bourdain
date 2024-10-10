@@ -28,6 +28,7 @@ COPY --from=build /usr/local/bin/web_service /usr/local/bin/web_service
 
 # Copy the config file to /config in the container
 COPY config.json /config/config.json
+COPY tooling/queries /config/queries
 
 # Expose the app port
 EXPOSE 8080

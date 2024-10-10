@@ -43,9 +43,8 @@ func getDSN(config *Config) string {
 	return dsn
 }
 
-// LoadSQLFile loads a SQL file from the tooling/queries directory
-func LoadSQLFile(queryName string) (string, error) {
-	filePath := filepath.Join("tooling", "queries", queryName)
+// LoadSQLFile loads a SQL file from a given directory
+func LoadSQLFile(filePath string) (string, error) {
 	sqlBytes, err := os.ReadFile(filepath.Clean(filePath)) // Use os.ReadFile instead of ioutil.ReadFile
 	if err != nil {
 		return "", err
@@ -53,9 +52,9 @@ func LoadSQLFile(queryName string) (string, error) {
 	return string(sqlBytes), nil
 }
 
-// ExecSQLFromFile executes a SQL file from the queries directory (when expecting no rows)
-func ExecSQLFromFile(db *sql.DB, queryName string, args ...interface{}) (sql.Result, error) {
-	sqlQuery, err := LoadSQLFile(queryName)
+// ExecSQLFromFile executes a SQL file from the given path (when expecting no rows)
+func ExecSQLFromFile(db *sql.DB, queryPath string, args ...interface{}) (sql.Result, error) {
+	sqlQuery, err := LoadSQLFile(queryPath)
 	if err != nil {
 		return nil, err
 	}

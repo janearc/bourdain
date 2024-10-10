@@ -20,8 +20,8 @@ func buildSchema(db *sql.DB) {
 		log.Printf("[buildschema] Current database: %s", remoteDB)
 	}
 
-	// Define the path to the SQL directory
-	sqlDir := "tooling/queries"
+	// Define the path to the SQL directory (inside docker)
+	sqlDir := "/config/queries"
 
 	// Read all the files from the SQL directory
 	files, err := os.ReadDir(sqlDir)
