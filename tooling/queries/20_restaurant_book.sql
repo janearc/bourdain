@@ -8,10 +8,20 @@ CREATE FUNCTION public.restaurant_book(
 AS $$
 DECLARE
     reservation_uuid uuid;
+    total_seating_capacity integer;
 BEGIN
-    -- Ensure the party size matches the number of diner UUIDs
-    IF array_length(diner_uuids, 1) IS DISTINCT FROM (SELECT num_diners FROM restaurants WHERE id = restaurant_uuid) THEN
-        RAISE EXCEPTION 'Party size does not match the number of diner UUIDs provided.';
+    -- Calculate the total seating capacity of the restaurant
+    SELECT
+        (cast(capacity->>'two-top' as integer) * 2) +
+        (cast(capacity->>'four-top' as integer) * 4) +
+        (cast(capacity->>'six-top' as integer) * 6)
+    INTO total_seating_capacity
+    FROM public.restaurants
+    WHERE id = restaurant_uuid;
+
+    -- Ensure the party size matches the available seating capacity
+    IF array_length(diner_uuids, 1) > total_seating_capacity THEN
+        RAISE EXCEPTION 'Party size exceeds the seating capacity of the restaurant.';
     END IF;
 
     -- Insert the new reservation
