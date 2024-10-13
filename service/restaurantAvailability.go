@@ -14,7 +14,7 @@ import (
 // restaurantAvailability returns a list of restaurants that can accommodate the number of diners and are open during the specified time
 func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	// Get query parameters
-	dinersStr := r.URL.Query().Get("diners")
+	dinersStr := r.URL.Query().Get("diners") // TODO: wait, what is this??
 	dinersUUIDStr := r.URL.Query().Get("dinerUUIDs")
 	startTimeStr := r.URL.Query().Get("start")
 	endTimeStr := r.URL.Query().Get("end")
