@@ -64,14 +64,14 @@ makefile, a bunch of sql stuff, and go stuff. there's a lot of different environ
 
 you can think of the environment as being separated into a few distinct parts:
 
-your environment (your laptop, whatever; this is mostly Makefile)
-docker-compose 
-docker images 
-the web service (golang)
-the database (postgres)
-the database schema (tables)
-the stored procedures (plsql functions that serve as a kind of api to the golang stuff)
-the data (which is both the "data" and the transactional state)
+- your environment (your laptop, whatever; this is mostly Makefile)
+- docker-compose 
+- docker images 
+- the web service (golang)
+- the database (postgres)
+- the database schema (tables)
+- the stored procedures (plsql functions that serve as a kind of api to the golang stuff)
+- the data (which is both the "data" and the transactional state)
 
 this seems pretty heavy-handed for two endpoints, and it is. however, because this is
 in docker, it is pretty trivial to just dump this into kubernetes or whatever, and host
