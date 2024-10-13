@@ -1,8 +1,9 @@
-CREATE TABLE IF NOT EXISTS reservations (
-                                            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                                            restaurant_id UUID REFERENCES restaurants(id),
-                                            diner_id UUID REFERENCES diners(id),
-                                            start_time TIMESTAMP NOT NULL,
-                                            end_time TIMESTAMP NOT NULL,
-                                            num_diners INTEGER NOT NULL
+CREATE TABLE public.reservations (
+                                     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+                                     restaurant_id uuid NOT NULL,
+                                     start_time timestamp without time zone NOT NULL,
+                                     end_time timestamp without time zone NOT NULL,
+                                     num_diners integer NOT NULL,
+                                     PRIMARY KEY (id),
+                                     FOREIGN KEY (restaurant_id) REFERENCES public.restaurants(id) ON DELETE CASCADE
 );
