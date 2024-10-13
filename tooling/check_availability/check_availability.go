@@ -34,8 +34,9 @@ func randomReservationTime() (time.Time, time.Time) {
 	startHour := rand.Intn(24)       // 0 to 23 hours
 	startMinute := rand.Intn(4) * 15 // 0, 15, 30, or 45 minutes
 
-	// Create a start time based on the random hour and minute
-	startTime := time.Date(0, 0, 0, startHour, startMinute, 0, 0, time.UTC)
+	// Use the current date instead of year 0
+	now := time.Now()
+	startTime := time.Date(now.Year(), now.Month(), now.Day(), startHour, startMinute, 0, 0, time.UTC)
 
 	// Set the minimum and maximum dining duration (30 to 120 minutes)
 	minDuration := 30
@@ -49,11 +50,14 @@ func randomReservationTime() (time.Time, time.Time) {
 }
 
 // Hit the availability endpoint with the party size and random reservation time
-func checkAvailability(partySize int, dinerUUIDs []string, startTime, endTime time.Time) error {
+func checkAvailability(dinerUUIDs []string, startTime, endTime time.Time) error {
 	// Join the diner UUIDs for the URL query string
 	dinerUUIDStr := strings.Join(dinerUUIDs, ",")
-	url := fmt.Sprintf("http://localhost:8080/restaurant/available?diners=%d&start=%s&end=%s&dinerUUIDs=%s",
-		partySize, startTime.Format("15:04"), endTime.Format("15:04"), dinerUUIDStr)
+	logrus.Infof("Parsed startTime: %v, endTime: %v", startTime, endTime)
+	url := fmt.Sprintf("http://localhost:8080/restaurant/available?startTime=%s&endTime=%s&dinerUUIDs=%s",
+		startTime.Format(time.RFC3339),
+		endTime.Format(time.RFC3339),
+		dinerUUIDStr)
 
 	// Log the request URL before making the HTTP request
 	logrus.Infof("Sending request to availability endpoint: %s", url)
@@ -85,13 +89,13 @@ func checkAvailability(partySize int, dinerUUIDs []string, startTime, endTime ti
 
 	// Handle the response based on the status code
 	if resp.StatusCode == http.StatusOK {
-		logrus.Infof("Party of %d diners found availability: %s", partySize, string(body))
+		logrus.Infof("Found availability: %s", string(body))
 	} else if resp.StatusCode == http.StatusInternalServerError {
-		logrus.Errorf("Server error (500) while checking availability for party of %d diners: %s", partySize, string(body))
+		logrus.Errorf("Server error (500) while checking availability [%s]", string(body))
 	} else if resp.StatusCode == http.StatusBadRequest {
-		logrus.Errorf("Bad request (400) for party of %d diners: %s", partySize, string(body))
+		logrus.Errorf("Bad request (400) while checking availability [%s]", string(body))
 	} else {
-		logrus.Warnf("Unexpected status code %d for party of %d diners: %s", resp.StatusCode, partySize, string(body))
+		logrus.Warnf("Unexpected status code %d for party [%s]", resp.StatusCode, string(body))
 	}
 
 	// Return nil if everything went fine
@@ -145,7 +149,7 @@ func main() {
 		logrus.Infof("Checking availability for a party from %s to %s...", startTime.Format("15:04"), endTime.Format("15:04"))
 
 		// Call checkAvailability with the correct arguments
-		err = checkAvailability(len(dinerUUIDs), dinerUUIDs, startTime, endTime)
+		err = checkAvailability(dinerUUIDs, startTime, endTime)
 		if err != nil {
 			logrus.Errorf("Error checking availability: %v", err)
 		}

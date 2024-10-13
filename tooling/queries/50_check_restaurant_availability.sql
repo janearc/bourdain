@@ -1,14 +1,18 @@
-CREATE OR REPLACE FUNCTION check_restaurant_availability(party_size int, diner_uuids uuid[], req_start_time timestamp, req_end_time timestamp)
+CREATE OR REPLACE FUNCTION check_restaurant_availability(
+    diner_uuids uuid[],
+    req_start_time timestamp,
+    req_end_time timestamp
+)
     RETURNS TABLE(restaurant_name text) AS $$
 BEGIN
     RETURN QUERY
         SELECT r.name::text
         FROM restaurants r
         WHERE
-          -- Check if restaurant can seat the party
+          -- Calculate party size from the number of UUIDs in the array
             (cast(r.capacity->>'two-top' as integer) * 2) +
             (cast(r.capacity->>'four-top' as integer) * 4) +
-            (cast(r.capacity->>'six-top' as integer) * 6) >= party_size
+            (cast(r.capacity->>'six-top' as integer) * 6) >= array_length(diner_uuids, 1)
           AND
           -- Check if restaurant endorsements include the diner preferences
             r.endorsements @> (
