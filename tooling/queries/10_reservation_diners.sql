@@ -1,3 +1,4 @@
+-- Create a junction table to link reservations to diners
 CREATE TABLE public.reservation_diners (
                                            reservation_id uuid NOT NULL,
                                            diner_id uuid NOT NULL,

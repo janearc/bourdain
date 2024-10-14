@@ -58,23 +58,32 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 	}()
 
 	// Collect results
-	var availableRestaurants []string
+	var availableRestaurants []map[string]string
 	for rows.Next() {
 		var name string
-		if err := rows.Scan(&name); err != nil {
+		var matchedEndorsements string // Holds endorsements in jsonb
+		var message string
+
+		if err := rows.Scan(&name, &matchedEndorsements, &message); err != nil {
 			logrus.Errorf("Error scanning result: %v", err)
 			http.Error(w, "Error scanning result", http.StatusInternalServerError)
 			return
 		}
-		availableRestaurants = append(availableRestaurants, name)
+		logrus.Infof("Found restaurant: %s, Endorsements: %s, Message: %s", name, matchedEndorsements, message)
+
+		restaurantInfo := map[string]string{
+			"name":                name,
+			"matchedEndorsements": matchedEndorsements,
+			"message":             message,
+		}
+		availableRestaurants = append(availableRestaurants, restaurantInfo)
 	}
 
 	// Return a 200 response with an empty list if no restaurants are found
 	w.Header().Set("Content-Type", "application/json")
 	if len(availableRestaurants) == 0 {
 		logrus.Infof("No restaurants available for the given parameters")
-		// Return an empty list
-		if err := json.NewEncoder(w).Encode([]string{}); err != nil {
+		if err := json.NewEncoder(w).Encode([]map[string]string{}); err != nil {
 			logrus.Errorf("Error encoding empty response: %v", err)
 			http.Error(w, "Error encoding response", http.StatusInternalServerError)
 		}

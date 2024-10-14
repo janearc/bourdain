@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION find_available_restaurants(
     RETURNS TABLE(restaurant_name text) AS $$
 BEGIN
     RETURN QUERY
-        SELECT r.name::text  -- Explicitly casting the name to text
+        SELECT r.name
         FROM restaurants r
         WHERE
             -- Check if restaurant endorsements include the diner preferences

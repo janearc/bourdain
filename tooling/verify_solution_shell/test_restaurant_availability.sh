@@ -26,10 +26,7 @@ DINERUUIDS=$(echo "$DINERUUIDS" | sed -n 's/.*\[\(.*\)\].*/\1/p')
 # Format the dinerUUIDs as a comma-separated string for the curl request
 DINERUUIDS_CSV=$(echo "$DINERUUIDS" | tr -d '"' | tr ',' ',')
 
-# Debugging output to verify the formatted UUIDs
-echo "Attempting to feed dinerUUIDs: $DINERUUIDS_CSV"
-
-# Execute the curl request directly without eval
+# Execute the curl request directly to get available restaurants
 RESPONSE=$(curl -s "http://localhost:8080/restaurant/available?dinerUUIDs=${DINERUUIDS_CSV}&startTime=${STARTTIME}&endTime=${ENDTIME}")
 
 # Check if curl executed successfully
@@ -38,6 +35,6 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Output the response (list of available restaurants in JSON format)
-echo "Response from restaurant/available endpoint:"
-echo "$RESPONSE"
+# Output the diner UUIDs and the available restaurants
+echo "Diner UUIDs: $DINERUUIDS_CSV"
+echo "Available restaurants: $RESPONSE"
