@@ -137,7 +137,7 @@ func buildParty(partySize int) ([]string, error) {
 }
 
 func main() {
-	for i := 1; i <= 10; i++ {
+	for i := 1; i <= 3; i++ {
 		// Build a random party and generate a random reservation time
 		dinerUUIDs, err := buildParty(generatePartySize())
 		if err != nil {

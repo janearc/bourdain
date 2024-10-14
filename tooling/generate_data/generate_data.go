@@ -261,8 +261,8 @@ func main() {
 		buildSchema(db)
 
 		// Insert data into the tables
-		insertRestaurants(50000, false, db)
-		insertDiners(150, false, db)
+		insertRestaurants(5000, false, db)
+		insertDiners(1000, false, db)
 
 		logrus.Info("Database initialized successfully with sample data.")
 	} else {

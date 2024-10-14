@@ -21,7 +21,7 @@ var (
 	frenchPhrases              = []string{"Le Rêve", "Maison", "Cuisine", "Gourmand", "Savoureux"}
 	italianPhrases             = []string{"La Vita", "Il Gusto", "Osteria", "Bontà"}
 	endorsementWeights         = map[string]float64{
-		"gluten-free":          0.10,
+		"gluten-free":          0.15,
 		"kid-friendly":         0.15,
 		"paleo":                0.05,
 		"vegan":                0.05,
@@ -29,7 +29,7 @@ var (
 		"halal":                0.10,
 		"kosher":               0.05,
 		"pet-friendly":         0.15,
-		"molecular-gastronomy": 0.01,
+		"molecular-gastronomy": 0.05,
 	}
 )
 

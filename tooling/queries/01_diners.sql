@@ -5,3 +5,5 @@ CREATE TABLE public.diners (
                                location public.geography(Point,4326),
                                PRIMARY KEY (id)
 );
+
+CREATE INDEX idx_diner_preferences ON diners USING gin (preferences);

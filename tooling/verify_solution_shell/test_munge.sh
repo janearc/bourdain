@@ -3,7 +3,7 @@
 # TOOLING defines the path for the test scripts
 TOOLING="./tooling/verify_solution_shell"
 
-SIZE=8
+SIZE=3
 
 # Chain the scripts together:
 # 1. Call test_restaurant_availability.sh to get available restaurants for a party of 3
