@@ -84,7 +84,7 @@ $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION check_restaurant_availability(
     diner_uuids uuid[], req_start_time timestamp, req_end_time timestamp
-) RETURNS TABLE(restaurant_name text, matched_endorsements jsonb, message text) AS $$
+) RETURNS TABLE(restaurant_id uuid, restaurant_name text, matched_endorsements jsonb, message text) AS $$
 DECLARE
     current_endorsements jsonb;
     party_size int;
@@ -107,7 +107,7 @@ BEGIN
 
     -- Step 4: Proceed with normal availability check if matches are found
     RETURN QUERY
-        SELECT r.name::text, r.endorsements, 'Match found'::text
+        SELECT r.id::uuid, r.name::text, r.endorsements, 'Match found'::text
         FROM restaurants r
         WHERE r.endorsements @> current_endorsements
           AND r.opening_time <= req_start_time::time

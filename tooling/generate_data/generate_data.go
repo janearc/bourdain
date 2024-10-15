@@ -257,12 +257,18 @@ func main() {
 		// Create the database extensions (UUID, PostGIS)
 		createDatabase(db)
 
-		// build the schema
+		// Build the schema
 		buildSchema(db)
 
 		// Insert data into the tables
 		insertRestaurants(5000, false, db)
 		insertDiners(1000, false, db)
+
+		// Now that restaurants are inserted, populate the tops
+		err = runPopulateTops(db)
+		if err != nil {
+			logrus.Fatalf("Error populating tops: %v", err)
+		}
 
 		logrus.Info("Database initialized successfully with sample data.")
 	} else {

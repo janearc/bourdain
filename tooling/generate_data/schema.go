@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	"github.com/janearc/bourdain/core"
-	"log"
+	"github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,13 +11,13 @@ import (
 	"strings"
 )
 
-// buildSchema builds the schema from static sql files to keep that out of the golang puddin
+// buildSchema builds the schema from static SQL files to keep that out of the Golang code
 func buildSchema(db *sql.DB) {
 	remoteDB, err := getCurrentDatabase(db)
 	if err != nil {
-		log.Fatalf("Error getting current database: %v", err)
+		logrus.Fatalf("Error getting current database: %v", err)
 	} else {
-		log.Printf("[buildschema] Current database: %s", remoteDB)
+		logrus.Infof("[buildschema] Current database: %s", remoteDB)
 	}
 
 	// Define the path to the SQL directory (inside docker)
@@ -26,7 +26,7 @@ func buildSchema(db *sql.DB) {
 	// Read all the files from the SQL directory
 	files, err := os.ReadDir(sqlDir)
 	if err != nil {
-		log.Fatalf("Error reading directory: %v", err)
+		logrus.Fatalf("Error reading directory: %v", err)
 	}
 
 	// Filter for SQL files
@@ -39,7 +39,6 @@ func buildSchema(db *sql.DB) {
 
 	// Sort the files numerically based on their prefix
 	sort.Slice(sqlFiles, func(i, j int) bool {
-		// Extract the numeric prefix from the file name
 		num1 := extractFilePrefix(sqlFiles[i].Name())
 		num2 := extractFilePrefix(sqlFiles[j].Name())
 		return num1 < num2
@@ -49,15 +48,41 @@ func buildSchema(db *sql.DB) {
 	for _, file := range sqlFiles {
 		sqlFilePath := filepath.Join(sqlDir, file.Name())
 
-		// Execute each SQL file
+		// Execute each SQL file normally for schema creation
 		_, err := core.ExecSQLFromFile(db, sqlFilePath)
 		if err != nil {
-			log.Fatalf("Error executing SQL file %s: %v", file.Name(), err)
+			logrus.Fatalf("Error executing SQL file %s: %v", file.Name(), err)
 		}
-		log.Printf("Successfully executed SQL file: %s", file.Name())
+		logrus.Infof("Successfully executed SQL file: %s", file.Name())
 	}
 
-	log.Println("All SQL entities created successfully")
+	logrus.Info("All SQL entities created and tops populated successfully.")
+}
+
+// runPopulateTops runs the populate_tops function after schema creation
+func runPopulateTops(db *sql.DB) error {
+	// Log the action to ensure visibility
+	logrus.Info("Attempting to populate tops...")
+
+	// Check if the connection is still valid
+	err := db.Ping()
+	if err != nil {
+		logrus.Fatalf("Database connection error during tops population: %v", err)
+	}
+
+	// Log before executing the populate_tops function
+	logrus.Info("Executing populate_tops() stored procedure...")
+
+	// Call populate_tops function using SELECT, as it's a stored procedure
+	_, err = db.Exec(`SELECT populate_tops();`)
+	if err != nil {
+		logrus.Errorf("Error executing populate_tops(): %v", err)
+		return err
+	}
+
+	// Confirm successful execution
+	logrus.Info("Tops populated successfully after schema creation.")
+	return nil
 }
 
 // extractFilePrefix extracts the numeric prefix from a file name (e.g., "00_restaurants.sql" -> 0)

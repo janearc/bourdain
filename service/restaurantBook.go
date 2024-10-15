@@ -19,6 +19,28 @@ func restaurantBook(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 	dinerUUIDStr := r.URL.Query().Get("dinerUUIDs")
 	restaurantUUID := r.URL.Query().Get("restaurantUUID")
 
+	// Check for missing parameters and log which one is missing
+	if startTimeStr == "" {
+		logrus.Error("Missing query parameter: startTime")
+		http.Error(w, "Missing required parameter: startTime", http.StatusBadRequest)
+		return
+	}
+	if endTimeStr == "" {
+		logrus.Error("Missing query parameter: endTime")
+		http.Error(w, "Missing required parameter: endTime", http.StatusBadRequest)
+		return
+	}
+	if dinerUUIDStr == "" {
+		logrus.Error("Missing query parameter: dinerUUIDs")
+		http.Error(w, "Missing required parameter: dinerUUIDs", http.StatusBadRequest)
+		return
+	}
+	if restaurantUUID == "" {
+		logrus.Error("Missing query parameter: restaurantUUID")
+		http.Error(w, "Missing required parameter: restaurantUUID", http.StatusBadRequest)
+		return
+	}
+
 	// Parse start and end times
 	startTime, err := time.Parse(time.RFC3339, startTimeStr)
 	if err != nil {

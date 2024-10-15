@@ -43,12 +43,15 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 	// Logging to help debug any potential issues
 	logrus.Infof("Diners: %v, UUIDs: %v, Start: %v, End: %v", len(dinerUUIDs), dinerUUIDs, startTime, endTime)
 
-	// Execute the SQL query
-	query := "SELECT * FROM check_restaurant_availability($1::uuid[], $2, $3);"
+	// Execute the SQL query to retrieve restaurant availability
+	query := `
+		SELECT r.restaurant_id, r.restaurant_name, r.matched_endorsements::text, r.message
+		FROM check_restaurant_availability($1::uuid[], $2, $3) AS r;
+	`
 	rows, err := db.Query(query, pq.Array(dinerUUIDs), startTime, endTime)
 	if err != nil {
 		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "raise_exception" {
-			// Handle the case where the database raises a specific exception (e.g., "No restaurants match the given endorsements")
+			// Treat this as no results found instead of an error
 			logrus.Warnf("No restaurants matched the given endorsements: %v", pqErr)
 			w.Header().Set("Content-Type", "application/json")
 			if err := json.NewEncoder(w).Encode([]map[string]string{}); err != nil {
@@ -62,6 +65,7 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
 		return
 	}
+
 	defer func() {
 		if err := rows.Close(); err != nil {
 			logrus.Errorf("Error closing rows: %v", err)
@@ -71,18 +75,20 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 	// Collect results
 	var availableRestaurants []map[string]string
 	for rows.Next() {
+		var restaurantID string
 		var name string
 		var matchedEndorsements string // Holds endorsements in jsonb
 		var message string
 
-		if err := rows.Scan(&name, &matchedEndorsements, &message); err != nil {
+		if err := rows.Scan(&restaurantID, &name, &matchedEndorsements, &message); err != nil {
 			logrus.Errorf("Error scanning result: %v", err)
 			http.Error(w, "Error scanning result", http.StatusInternalServerError)
 			return
 		}
-		logrus.Infof("Found restaurant: %s, Endorsements: %s, Message: %s", name, matchedEndorsements, message)
+		logrus.Infof("Found restaurant: %s (ID: %s), Endorsements: %s, Message: %s", name, restaurantID, matchedEndorsements, message)
 
 		restaurantInfo := map[string]string{
+			"id":                  restaurantID,
 			"name":                name,
 			"matchedEndorsements": matchedEndorsements,
 			"message":             message,

@@ -14,52 +14,39 @@ import (
 // Create a new random source and generator
 var carng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-// Struct for a restaurant
+// Struct for restaurant details with correct JSON mapping
 type Restaurant struct {
-	ID                  string `json:"id"`
-	Name                string `json:"name"`
-	MatchedEndorsements string `json:"matchedEndorsements"`
-	Message             string `json:"message"`
-}
-
-// Struct for a diner
-type Diner struct {
-	ID   string `json:"id"`
+	ID   string `json:"id"` // Ensure this matches the JSON field returned from the API
 	Name string `json:"name"`
 }
 
-// Struct for a reservation
 type Reservation struct {
-	ID           string   `json:"id"`
 	RestaurantID string   `json:"restaurant_id"`
 	DinerUUIDs   []string `json:"diner_uuids"`
 	StartTime    string   `json:"start_time"`
 	EndTime      string   `json:"end_time"`
 }
 
-// Generates a random number of diners for a party with adjusted distribution
-// 10 parties of 2-4, one party of 6, and one party of 10
+// Generates a random number of diners for a party
 func generatePartySize() int {
 	r := carng.Float64()
 	switch {
-	case r < 0.9: // 90% chance for small parties (2-4 diners)
-		return carng.Intn(3) + 2
-	case r < 0.975: // 7.5% chance for a party of 6
-		return 6
-	default: // 2.5% chance for a party of 10
-		return 10
+	case r < 0.9:
+		return carng.Intn(3) + 2 // 2-4 diners
+	case r < 0.975:
+		return 6 // 7.5% chance for 6 diners
+	default:
+		return 10 // 2.5% chance for 10 diners
 	}
 }
 
-// randomReservationTime generates a random start and end time for a reservation, in 15-minute increments
+// Generate random reservation times
 func randomReservationTime() (time.Time, time.Time) {
-	startHour := rand.Intn(24)       // 0 to 23 hours
-	startMinute := rand.Intn(4) * 15 // 0, 15, 30, or 45 minutes
-
+	startHour := rand.Intn(24)
+	startMinute := rand.Intn(4) * 15
 	now := time.Now()
 	startTime := time.Date(now.Year(), now.Month(), now.Day(), startHour, startMinute, 0, 0, time.UTC)
 
-	// Random dining duration (30 to 120 minutes)
 	minDuration := 30
 	maxDuration := 120
 	randomDurationMinutes := rand.Intn((maxDuration-minDuration)/15+1)*15 + minDuration
@@ -68,12 +55,13 @@ func randomReservationTime() (time.Time, time.Time) {
 	return startTime, endTime
 }
 
-// Hit the availability endpoint with the party size and random reservation time
+// Check availability by hitting the /restaurant/available endpoint
 func checkAvailability(dinerUUIDs []string, startTime, endTime time.Time) ([]Restaurant, error) {
 	dinerUUIDStr := strings.Join(dinerUUIDs, ",")
-	logrus.Infof("Parsed startTime: %v, endTime: %v", startTime, endTime)
 	url := fmt.Sprintf("http://localhost:8080/restaurant/available?startTime=%s&endTime=%s&dinerUUIDs=%s",
 		startTime.Format(time.RFC3339), endTime.Format(time.RFC3339), dinerUUIDStr)
+
+	logrus.Infof("Checking availability at URL: %s", url)
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -88,21 +76,24 @@ func checkAvailability(dinerUUIDs []string, startTime, endTime time.Time) ([]Res
 		return nil, fmt.Errorf("error reading response: %v", err)
 	}
 
+	// Log the raw response body for debugging
+	logrus.Infof("Raw response body: %s", string(body))
+
 	if resp.StatusCode == http.StatusOK {
-		restaurants := []Restaurant{}
+		var restaurants []Restaurant
 		err := json.Unmarshal(body, &restaurants)
 		if err != nil {
 			logrus.Errorf("Error decoding response: %v", err)
 			return nil, fmt.Errorf("error decoding response: %v", err)
 		}
-		logrus.Infof("Found availability at %d stores", len(restaurants))
+		logrus.Infof("Found availability at %d restaurants", len(restaurants))
 
-		// Randomly select one restaurant from available
 		if len(restaurants) > 0 {
 			selectedRestaurant := restaurants[rand.Intn(len(restaurants))]
-			logrus.Infof("Randomly selected restaurant: %s", selectedRestaurant.Name)
-			return []Restaurant{selectedRestaurant}, nil
+			logrus.Infof("Randomly selected restaurant: %s (%s)", selectedRestaurant.Name, selectedRestaurant.ID)
+			return restaurants, nil
 		}
+		logrus.Warnf("No restaurants available")
 	} else {
 		logrus.Warnf("Unexpected status code %d for party [%s]", resp.StatusCode, string(body))
 	}
@@ -110,7 +101,38 @@ func checkAvailability(dinerUUIDs []string, startTime, endTime time.Time) ([]Res
 	return nil, nil
 }
 
-// create a hypothetical party that we're going to use to assess availability
+// Book a reservation via the /restaurant/book endpoint
+func bookReservation(reservation Reservation) error {
+	if reservation.RestaurantID == "" {
+		logrus.Error("RestaurantID is empty. Cannot book reservation.")
+		return fmt.Errorf("restaurant ID is missing")
+	}
+
+	// Construct URL for the booking request
+	url := fmt.Sprintf(
+		"http://localhost:8080/restaurant/book?startTime=%s&endTime=%s&dinerUUIDs=%s&restaurantUUID=%s",
+		reservation.StartTime, reservation.EndTime, strings.Join(reservation.DinerUUIDs, ","), reservation.RestaurantID,
+	)
+	logrus.Infof("Booking reservation at URL: %s", url)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		logrus.Errorf("Error booking reservation: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		logrus.Errorf("Failed to book reservation, status code: %d, response: %s", resp.StatusCode, string(body))
+		return fmt.Errorf("failed to book reservation, status code: %d", resp.StatusCode)
+	}
+
+	logrus.Infof("Successfully booked reservation for restaurant %s", reservation.RestaurantID)
+	return nil
+}
+
+// Generate a party of diners
 func buildParty(partySize int) ([]string, error) {
 	url := fmt.Sprintf("http://localhost:8080/private/build_party?partySize=%d", partySize)
 
@@ -153,11 +175,20 @@ func main() {
 			continue
 		}
 
-		// Now you can use availableRestaurants to call the /restaurant/book endpoint
+		// Proceed to book the reservation
 		if len(availableRestaurants) > 0 {
-			// Example of booking logic, you can enhance it
-			logrus.Infof("Proceeding to book a reservation at restaurant: %s", availableRestaurants[0].Name)
-			// Call /restaurant/book here with availableRestaurants[0]
+			selectedRestaurant := availableRestaurants[0]
+			reservation := Reservation{
+				RestaurantID: selectedRestaurant.ID,
+				DinerUUIDs:   dinerUUIDs,
+				StartTime:    startTime.Format(time.RFC3339),
+				EndTime:      endTime.Format(time.RFC3339),
+			}
+
+			err = bookReservation(reservation)
+			if err != nil {
+				logrus.Errorf("Error booking reservation: %v", err)
+			}
 		}
 
 		time.Sleep(1 * time.Second) // Sleep between requests to avoid hammering the server

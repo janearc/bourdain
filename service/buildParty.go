@@ -21,8 +21,8 @@ func buildParty(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 
 	logrus.Infof("Building party of size %d", partySize)
 
-	// Call the `generate_party` function in the database
-	query := `SELECT diner_id FROM generate_party($1)`
+	// Call the `generate_party` function in the database, casting diner_id to text for safety
+	query := `SELECT diner_id::text FROM generate_party($1)`
 	rows, err := db.Query(query, partySize)
 	if err != nil {
 		logrus.Errorf("Error querying party: %v", err)
@@ -47,7 +47,13 @@ func buildParty(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		dinerUUIDs = append(dinerUUIDs, dinerID)
 	}
 
-	logrus.Info("party assembled.")
+	if err := rows.Err(); err != nil {
+		logrus.Errorf("Error during rows iteration: %v", err)
+		http.Error(w, "Error during rows iteration", http.StatusInternalServerError)
+		return
+	}
+
+	logrus.Info("Party assembled successfully.")
 
 	// Return the party UUIDs as JSON
 	w.Header().Set("Content-Type", "application/json")

@@ -9,50 +9,113 @@ create TABLE public.tops (
                              FOREIGN KEY (reservation_id) REFERENCES public.reservations(id) ON DELETE SET NULL
 );
 
-    DO $$
-    DECLARE
-        restaurant RECORD;
-        table_id UUID;
-        num_two_top int;
-        num_four_top int;
-        num_six_top int;
-        i int;
-    BEGIN
-        -- Loop through each restaurant
-        FOR restaurant IN
-            SELECT id, capacity
-            FROM restaurants
-            LOOP
-                -- Get the number of two-tops, four-tops, and six-tops for the current restaurant
-                num_two_top := (restaurant.capacity->>'two-top')::int;
-                num_four_top := (restaurant.capacity->>'four-top')::int;
-                num_six_top := (restaurant.capacity->>'six-top')::int;
+CREATE OR REPLACE FUNCTION populate_tops() RETURNS void AS $$
+DECLARE
+    restaurant RECORD;
+    table_id UUID;
+    num_two_top int;
+    num_four_top int;
+    num_six_top int;
+    i int;
+BEGIN
+    -- Loop through each restaurant
+    FOR restaurant IN
+        SELECT id, capacity
+        FROM restaurants
+        LOOP
+            RAISE NOTICE 'Populating tops for restaurant: %', restaurant.id;
 
-                -- Insert two-top tables
-                IF num_two_top > 0 THEN
-                    FOR i IN 1..num_two_top LOOP
-                            INSERT INTO tops (restaurant_id, table_size, occupied)
-                            VALUES (restaurant.id, 2, false);
-                        END LOOP;
-                END IF;
+            -- Get the number of two-tops, four-tops, and six-tops for the current restaurant
+            num_two_top := (restaurant.capacity->>'two-top')::int;
+            num_four_top := (restaurant.capacity->>'four-top')::int;
+            num_six_top := (restaurant.capacity->>'six-top')::int;
 
-                -- Insert four-top tables
-                IF num_four_top > 0 THEN
-                    FOR i IN 1..num_four_top LOOP
-                            INSERT INTO tops (restaurant_id, table_size, occupied)
-                            VALUES (restaurant.id, 4, false);
-                        END LOOP;
-                END IF;
+            RAISE NOTICE 'Two-tops: %, Four-tops: %, Six-tops: %', num_two_top, num_four_top, num_six_top;
 
-                -- Insert six-top tables
-                IF num_six_top > 0 THEN
-                    FOR i IN 1..num_six_top LOOP
-                            INSERT INTO tops (restaurant_id, table_size, occupied)
-                            VALUES (restaurant.id, 6, false);
-                        END LOOP;
-                END IF;
-            END LOOP;
-    END $$;
+            -- Insert two-top tables
+            IF num_two_top > 0 THEN
+                FOR i IN 1..num_two_top LOOP
+                        INSERT INTO tops (restaurant_id, table_size, occupied)
+                        VALUES (restaurant.id, 2, false);
+                        RAISE NOTICE 'Inserted two-top for restaurant: %', restaurant.id;
+                    END LOOP;
+            END IF;
+
+            -- Insert four-top tables
+            IF num_four_top > 0 THEN
+                FOR i IN 1..num_four_top LOOP
+                        INSERT INTO tops (restaurant_id, table_size, occupied)
+                        VALUES (restaurant.id, 4, false);
+                        RAISE NOTICE 'Inserted four-top for restaurant: %', restaurant.id;
+                    END LOOP;
+            END IF;
+
+            -- Insert six-top tables
+            IF num_six_top > 0 THEN
+                FOR i IN 1..num_six_top LOOP
+                        INSERT INTO tops (restaurant_id, table_size, occupied)
+                        VALUES (restaurant.id, 6, false);
+                        RAISE NOTICE 'Inserted six-top for restaurant: %', restaurant.id;
+                    END LOOP;
+            END IF;
+        END LOOP;
+
+    RAISE NOTICE 'Finished populating tops for all restaurants.';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION populate_tops() RETURNS void AS $$
+DECLARE
+    restaurant RECORD;
+    num_two_top int;
+    num_four_top int;
+    num_six_top int;
+BEGIN
+    -- Loop through each restaurant
+    FOR restaurant IN
+        SELECT id, capacity
+        FROM restaurants
+        LOOP
+            RAISE NOTICE 'Populating tops for restaurant: %', restaurant.id;
+
+            -- Get the number of two-tops, four-tops, and six-tops for the current restaurant
+            num_two_top := (restaurant.capacity->>'two-top')::int;
+            num_four_top := (restaurant.capacity->>'four-top')::int;
+            num_six_top := (restaurant.capacity->>'six-top')::int;
+
+            RAISE NOTICE 'Two-tops: %, Four-tops: %, Six-tops: %', num_two_top, num_four_top, num_six_top;
+
+            -- Insert two-top tables
+            IF num_two_top > 0 THEN
+                FOR _ IN 1..num_two_top LOOP
+                        INSERT INTO tops (restaurant_id, table_size, occupied)
+                        VALUES (restaurant.id, 2, false);
+                        RAISE NOTICE 'Inserted two-top for restaurant: %', restaurant.id;
+                    END LOOP;
+            END IF;
+
+            -- Insert four-top tables
+            IF num_four_top > 0 THEN
+                FOR _ IN 1..num_four_top LOOP
+                        INSERT INTO tops (restaurant_id, table_size, occupied)
+                        VALUES (restaurant.id, 4, false);
+                        RAISE NOTICE 'Inserted four-top for restaurant: %', restaurant.id;
+                    END LOOP;
+            END IF;
+
+            -- Insert six-top tables
+            IF num_six_top > 0 THEN
+                FOR _ IN 1..num_six_top LOOP
+                        INSERT INTO tops (restaurant_id, table_size, occupied)
+                        VALUES (restaurant.id, 6, false);
+                        RAISE NOTICE 'Inserted six-top for restaurant: %', restaurant.id;
+                    END LOOP;
+            END IF;
+        END LOOP;
+
+    RAISE NOTICE 'Finished populating tops for all restaurants.';
+END;
+$$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION get_available_tops(
     restaurant_uuid uuid, req_start_time timestamp, req_end_time timestamp
