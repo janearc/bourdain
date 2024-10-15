@@ -29,6 +29,16 @@ func ConnectDB(config *Config) (*sql.DB, error) {
 	return db, nil
 }
 
+// GetCurrentDatabase retrieves the name of the currently connected database
+func GetCurrentDatabase(db *sql.DB) (string, error) {
+	var dbName string
+	err := db.QueryRow("SELECT current_database();").Scan(&dbName)
+	if err != nil {
+		return "", fmt.Errorf("error fetching current database: %v", err)
+	}
+	return dbName, nil
+}
+
 func getDSN(config *Config) string {
 	logrus.Info("getDSN is being called") // This will crash the app to ensure it runs this code
 	escapedUser := url.QueryEscape(config.Database.User)

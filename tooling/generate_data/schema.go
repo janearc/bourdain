@@ -13,7 +13,7 @@ import (
 
 // buildSchema builds the schema from static SQL files to keep that out of the Golang code
 func buildSchema(db *sql.DB) {
-	remoteDB, err := getCurrentDatabase(db)
+	remoteDB, err := core.GetCurrentDatabase(db)
 	if err != nil {
 		logrus.Fatalf("Error getting current database: %v", err)
 	} else {
@@ -56,7 +56,7 @@ func buildSchema(db *sql.DB) {
 		logrus.Infof("Successfully executed SQL file: %s", file.Name())
 	}
 
-	logrus.Info("All SQL entities created and tops populated successfully.")
+	logrus.Info("All SQL entities created.")
 }
 
 // runPopulateTops runs the populate_tops function after schema creation

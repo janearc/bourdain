@@ -16,97 +16,39 @@ import (
 // Initialize a local random generator
 var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 
+// createDatabase enables necessary extensions and configures the database.
 func createDatabase(db *sql.DB) {
-	remoteDB, err := getCurrentDatabase(db)
-
+	dbName, err := core.GetCurrentDatabase(db)
 	if err != nil {
 		logrus.Fatalf("Error getting current database: %v", err)
-	} else {
-		logrus.Infof("[createdb] Current database: %s", remoteDB)
 	}
 
-	// Enable the uuid-ossp extension for generating UUIDs
-	_, err = db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`)
-	if err != nil {
-		logrus.Fatalf("Error creating uuid-ossp extension: %v", err)
+	// Enable extensions: uuid-ossp, PostGIS
+	extensions := []string{
+		`CREATE EXTENSION IF NOT EXISTS "uuid-ossp";`,
+		`CREATE EXTENSION IF NOT EXISTS postgis;`,
 	}
-
-	// Enable the PostGIS extension for geography support
-	_, err = db.Exec(`CREATE EXTENSION IF NOT EXISTS postgis;`)
-	if err != nil {
-		logrus.Fatalf("Error creating PostGIS extension: %v", err)
-	}
-
-	// set logging to horrifying
-	_, err = db.Exec(`ALTER DATABASE ` + remoteDB + ` SET log_statement = 'all';`)
-	if err != nil {
-		logrus.Fatalf("Error setting log_statement: %v", err)
-	}
-
-	_, err = db.Exec("ALTER SYSTEM SET client_min_messages TO 'NOTICE';")
-	if err != nil {
-		logrus.Fatalf("Error setting client_min_messages: %v", err)
-	}
-
-	logrus.Info("Database extensions and setup complete")
-}
-
-func randomLocation() (float64, float64) {
-	latBounds := [2]float64{40.5774, 40.9176} // Rough latitude range for Manhattan, Brooklyn, Bronx
-	lonBounds := [2]float64{-74.15, -73.7004} // Rough longitude range
-
-	lat := latBounds[0] + (rng.Float64() * (latBounds[1] - latBounds[0]))
-	lon := lonBounds[0] + (rng.Float64() * (lonBounds[1] - lonBounds[0]))
-	return lat, lon
-}
-
-func randomEndorsements() []string {
-	num := rng.Intn(3) + 1
-	var selected []string
-	for i := 0; i < num; i++ {
-		selected = append(selected, Endorsements[rng.Intn(len(Endorsements))])
-	}
-	return selected
-}
-
-func randomPreferences() []string {
-	// Create a slice of preferences based on the weights
-	allPreferences := make([]string, 0, len(endorsementWeights))
-	for pref, weight := range endorsementWeights {
-		// Add preference to the list multiple times based on its weight
-		count := int(weight * 100) // Adjust weight scaling as needed
-		for i := 0; i < count; i++ {
-			allPreferences = append(allPreferences, pref)
+	for _, ext := range extensions {
+		if _, err := db.Exec(ext); err != nil {
+			logrus.Fatalf("Error creating extension: %v", err)
 		}
 	}
 
-	// 25% chance to have no preferences at all
-	if rand.Float64() < 0.25 {
-		return []string{}
+	// Set logging for better insights
+	dbSettings := []string{
+		fmt.Sprintf(`ALTER DATABASE %s SET log_statement = 'all';`, dbName),
+		`ALTER SYSTEM SET client_min_messages TO 'NOTICE';`,
 	}
-
-	// 60% chance to have exactly one preference
-	if rand.Float64() < 0.60 {
-		return []string{allPreferences[rand.Intn(len(allPreferences))]}
-	}
-
-	// Only 15% chance to have two preferences
-	if rand.Float64() < 0.15 {
-		pref1 := allPreferences[rand.Intn(len(allPreferences))]
-		pref2 := allPreferences[rand.Intn(len(allPreferences))]
-		// Ensure the two preferences are distinct
-		for pref1 == pref2 {
-			pref2 = allPreferences[rand.Intn(len(allPreferences))]
+	for _, setting := range dbSettings {
+		if _, err := db.Exec(setting); err != nil {
+			logrus.Fatalf("Error setting database parameters: %v", err)
 		}
-		return []string{pref1, pref2}
 	}
 
-	// Even rarer chance (5%) to have three or more preferences
-	numPrefs := rand.Intn(3) + 1 // Randomly pick 1 to 3 preferences
-	rand.Shuffle(len(allPreferences), func(i, j int) { allPreferences[i], allPreferences[j] = allPreferences[j], allPreferences[i] })
-	return allPreferences[:numPrefs]
+	logrus.Info("Database extensions and settings applied")
 }
 
+// insertRestaurants inserts random restaurant data into the database.
 func insertRestaurants(count int, stdout bool, db *sql.DB) {
 	for i := 0; i < count; i++ {
 		name := RandomRestaurantName(rng)
@@ -118,70 +60,49 @@ func insertRestaurants(count int, stdout bool, db *sql.DB) {
 		}
 		endors := randomEndorsements()
 
-		// Marshal capacity and endorsements to JSON
-		capacityJSON, err := json.Marshal(capacity)
-		if err != nil {
-			logrus.Errorf("Error marshaling capacity JSON: %v", err)
-			continue
-		}
-		endorsJSON, err := json.Marshal(endors)
-		if err != nil {
-			logrus.Errorf("Error marshaling endorsements JSON: %v", err)
-			continue
-		}
+		capacityJSON, _ := json.Marshal(capacity)
+		endorsJSON, _ := json.Marshal(endors)
 
-		// Randomly assign hours based on the given probabilities
-		var openingTime, closingTime string
+		openingTime, closingTime := randomBusinessHours()
 
-		// 10% chance of being a 24-hour restaurant
-		if rng.Float64() < 0.1 {
-			openingTime = "00:00"
-			closingTime = "23:59"
-		} else if rng.Float64() < 0.25 { // 25% chance of being open from 10am to 10pm
-			openingTime = "10:00"
-			closingTime = "22:00"
-		} else { // The rest will be dinner places (5:30pm to 11:30pm)
-			openingTime = "17:30"
-			closingTime = "23:30"
-		}
-
-		// Insert the restaurant and return the generated UUID
 		sqlStmt := `
 			INSERT INTO restaurants (name, capacity, endorsements, location, opening_time, closing_time)
 			VALUES ($1, $2::jsonb, $3::jsonb, ST_SetSRID(ST_MakePoint($4, $5), 4326), $6, $7)
 			RETURNING id;`
 
-		if stdout || db == nil {
+		if stdout {
 			logrus.Infof("Would execute: %s", sqlStmt)
 		} else {
 			var id string
-			err := db.QueryRow(sqlStmt, name, string(capacityJSON), string(endorsJSON), lon, lat, openingTime, closingTime).Scan(&id)
-			if err != nil {
+			if err := db.QueryRow(sqlStmt, name, string(capacityJSON), string(endorsJSON), lon, lat, openingTime, closingTime).Scan(&id); err != nil {
 				logrus.Errorf("Error inserting restaurant: %v", err)
 			}
 		}
 	}
 }
 
+// insertDiners inserts a specified number of diners into the database
 func insertDiners(count int, stdout bool, db *sql.DB) {
 	for i := 0; i < count; i++ {
-		name := RandomName(rng)
-		lat, lon := randomLocation()
-		prefs := randomPreferences()
+		name := RandomName(rng)       // Generate a random diner name
+		lat, lon := randomLocation()  // Generate random latitude and longitude
+		prefs := randomEndorsements() // Generate random preferences
 
-		// Marshal preferences to JSON (since it's a JSONB field)
+		// Marshal preferences to JSON (since it's stored as JSONB in the database)
 		prefsJSON, err := json.Marshal(prefs)
 		if err != nil {
 			logrus.Errorf("Error marshaling preferences JSON: %v", err)
 			continue
 		}
 
-		// Insert the diner and return the generated UUID
+		// SQL statement to insert a diner
 		sqlStmt := `
 			INSERT INTO diners (name, preferences, location)
 			VALUES ($1, $2::jsonb, ST_SetSRID(ST_MakePoint($3, $4), 4326))
-			RETURNING id;`
+			RETURNING id;
+		`
 
+		// Log SQL for stdout mode, or execute the insert if not in stdout mode
 		if stdout || db == nil {
 			logrus.Infof("Would execute: %s", sqlStmt)
 		} else {
@@ -194,17 +115,20 @@ func insertDiners(count int, stdout bool, db *sql.DB) {
 	}
 }
 
-func getCurrentDatabase(db *sql.DB) (string, error) {
-	var dbName string
-	err := db.QueryRow("SELECT current_database();").Scan(&dbName)
-	if err != nil {
-		return "", fmt.Errorf("error fetching current database: %v", err)
+// randomBusinessHours returns randomly selected opening and closing times for restaurants.
+func randomBusinessHours() (string, string) {
+	switch r := rng.Float64(); {
+	case r < 0.1: // 24-hour restaurant (10%)
+		return "00:00", "23:59"
+	case r < 0.35: // 10am to 10pm (25%)
+		return "10:00", "22:00"
+	default: // Dinner place (5:30pm to 11:30pm)
+		return "17:30", "23:30"
 	}
-	return dbName, nil
 }
 
+// main is the entry point of the application. It handles different modes like DB initialization, SQL stdout, and name generation.
 func main() {
-	// Flags to determine mode of operation
 	stdout := flag.Bool("stdout", false, "Print SQL statements to stdout instead of executing")
 	initdb := flag.Bool("initdb", false, "Initialize the database with test data")
 	configFile := flag.String("config", "/config/config.json", "Path to the config file")
@@ -213,17 +137,13 @@ func main() {
 	flag.Parse()
 
 	// Configure Logrus
-	logrus.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp: true,
-	})
+	logrus.SetFormatter(&logrus.TextFormatter{FullTimestamp: true})
 	logrus.SetLevel(logrus.InfoLevel)
 
-	// Handle the fun name generation flags
 	if *properName {
 		fmt.Println(RandomName(rng))
 		return
 	}
-
 	if *restaurantName {
 		fmt.Println(RandomRestaurantName(rng))
 		return
@@ -235,43 +155,30 @@ func main() {
 		logrus.Fatalf("Error loading config: %v", err)
 	}
 
-	// Connect to the database using core.ConnectDB
+	// Connect to the database
 	db, err := core.ConnectDB(config)
 	if err != nil {
 		logrus.Fatalf("Error connecting to the database: %v", err)
 	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			logrus.Errorf("Error closing the database connection: %v", err)
-		}
-	}()
+	defer db.Close()
 
 	if *stdout {
-		// Generate and print SQL statements instead of inserting into DB
-		logrus.Info("Generating SQL statements for restaurants and diners...")
+		logrus.Info("Generating SQL statements...")
 		insertRestaurants(10, true, nil)
-		insertDiners(10, true, nil)
 	} else if *initdb {
 		logrus.Info("Initializing database...")
-
-		// Create the database extensions (UUID, PostGIS)
 		createDatabase(db)
-
-		// Build the schema
 		buildSchema(db)
 
-		// Insert data into the tables
-		insertRestaurants(5000, false, db)
-		insertDiners(1000, false, db)
+		// if stuff gets slow, turn these down a little
+		insertRestaurants(15000, false, db)
+		insertDiners(250, false, db)
 
-		// Now that restaurants are inserted, populate the tops
-		err = runPopulateTops(db)
-		if err != nil {
+		if err = runPopulateTops(db); err != nil {
 			logrus.Fatalf("Error populating tops: %v", err)
 		}
-
 		logrus.Info("Database initialized successfully with sample data.")
 	} else {
-		logrus.Warn("Please specify either --stdout, --initdb, --proper-name, or --restaurant-name.")
+		logrus.Warn("Please specify --stdout, --initdb, --proper-name, or --restaurant-name.")
 	}
 }

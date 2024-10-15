@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"github.com/sirupsen/logrus"
 	"net/http"
 	"strconv"
 )
@@ -19,46 +18,33 @@ func buildParty(w http.ResponseWriter, r *http.Request, db *sql.DB) {
 		return
 	}
 
-	logrus.Infof("Building party of size %d", partySize)
-
-	// Call the `generate_party` function in the database, casting diner_id to text for safety
+	// Call the `generate_party` function in the database
 	query := `SELECT diner_id::text FROM generate_party($1)`
 	rows, err := db.Query(query, partySize)
 	if err != nil {
-		logrus.Errorf("Error querying party: %v", err)
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
 		return
 	}
-	defer func() {
-		if err := rows.Close(); err != nil {
-			logrus.Errorf("Error closing rows: %v", err)
-		}
-	}()
+	defer rows.Close()
 
 	// Collect the results
 	var dinerUUIDs []string
 	for rows.Next() {
 		var dinerID string
 		if err := rows.Scan(&dinerID); err != nil {
-			logrus.Errorf("Error scanning result: %v", err)
 			http.Error(w, "Error scanning result", http.StatusInternalServerError)
 			return
 		}
 		dinerUUIDs = append(dinerUUIDs, dinerID)
 	}
 
+	// Check for errors during rows iteration
 	if err := rows.Err(); err != nil {
-		logrus.Errorf("Error during rows iteration: %v", err)
-		http.Error(w, "Error during rows iteration", http.StatusInternalServerError)
+		http.Error(w, "Error processing data", http.StatusInternalServerError)
 		return
 	}
 
-	logrus.Info("Party assembled successfully.")
-
 	// Return the party UUIDs as JSON
 	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(dinerUUIDs); err != nil {
-		logrus.Errorf("Error encoding response: %v", err)
-		http.Error(w, "Error encoding response", http.StatusInternalServerError)
-	}
+	json.NewEncoder(w).Encode(dinerUUIDs)
 }

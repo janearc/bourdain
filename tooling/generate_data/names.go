@@ -7,7 +7,6 @@ import (
 
 // Exported variables and functions
 var (
-	Endorsements               = []string{"gluten-free", "kid-friendly", "paleo", "vegan", "organic", "halal", "kosher", "pet-friendly", "molecular-gastronomy"}
 	firstNames                 = []string{"Chester", "Camden", "Harriet", "Olivia", "Arthur", "Eleanor", "Percival", "Jasper", "Florence", "Theodore", "Boris", "Natasha", "Rocky", "Bullwinkle"}
 	lastNames                  = []string{"Hackington", "Perspicacious", "Smith", "Wellington", "Crumble", "Burlington", "Peabody", "Fitzroy", "Wainwright", "Harrington"}
 	californiaAdjectives       = []string{"Sunny", "Fresh", "New", "Inverted", "Golden", "Crispy", "Hearty"}
@@ -72,4 +71,44 @@ func RandomRestaurantName(rng *rand.Rand) string {
 	default:
 		return "Unnamed Eatery"
 	}
+}
+
+// randomLocation generates a random latitude and longitude within the bounds of Manhattan, Brooklyn, and Bronx.
+func randomLocation() (float64, float64) {
+	// Define rough latitude and longitude bounds for Manhattan, Brooklyn, and Bronx
+	latBounds := [2]float64{40.5774, 40.9176} // Approx latitude range
+	lonBounds := [2]float64{-74.15, -73.7004} // Approx longitude range
+
+	// Generate random latitude and longitude within the defined bounds
+	lat := latBounds[0] + rng.Float64()*(latBounds[1]-latBounds[0])
+	lon := lonBounds[0] + rng.Float64()*(lonBounds[1]-lonBounds[0])
+
+	return lat, lon
+}
+
+// randomEndorsements selects endorsements based on defined weights in endorsementWeights.
+func randomEndorsements() []string {
+	// Create a slice of endorsements where each appears multiple times based on its weight
+	allEndorsements := make([]string, 0)
+	for endorsement, weight := range endorsementWeights {
+		count := int(weight * 100) // Scale the weight to an integer (out of 100)
+		for i := 0; i < count; i++ {
+			allEndorsements = append(allEndorsements, endorsement)
+		}
+	}
+
+	// Shuffle the endorsements slice to ensure randomness
+	rng.Shuffle(len(allEndorsements), func(i, j int) {
+		allEndorsements[i], allEndorsements[j] = allEndorsements[j], allEndorsements[i]
+	})
+
+	// Randomly select 1-3 endorsements from the weighted list
+	numEndorsements := rng.Intn(3) + 1 // Random number between 1 and 3
+	selected := make([]string, numEndorsements)
+
+	for i := 0; i < numEndorsements; i++ {
+		selected[i] = allEndorsements[rng.Intn(len(allEndorsements))]
+	}
+
+	return selected
 }
