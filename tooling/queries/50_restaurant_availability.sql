@@ -87,49 +87,39 @@ CREATE OR REPLACE FUNCTION check_restaurant_availability(
 ) RETURNS TABLE(restaurant_name text, matched_endorsements jsonb, message text) AS $$
 DECLARE
     current_endorsements jsonb;
-    match_found boolean := false;
     party_size int;
-    result RECORD;
 BEGIN
     -- Step 1: Calculate the party size
-    party_size := calculate_party_size(diner_uuids);
+    party_size := array_length(diner_uuids, 1);
 
     -- Step 2: Get the endorsements of the diners
     current_endorsements := get_endorsements_for_diners(diner_uuids);
 
-    -- Step 3: Try for a full match
-    FOR result IN SELECT * FROM attempt_match(party_size, current_endorsements, req_start_time, req_end_time)
-        LOOP
-            match_found := true;
-            RETURN QUERY SELECT result.restaurant_name, result.matched_endorsements, 'Full match found';
-        END LOOP;
-
-    -- Step 4: Reduce endorsements if no full match found
-    LOOP
-        IF NOT match_found THEN
-            IF jsonb_array_length(current_endorsements) = 0 THEN
-                RAISE NOTICE 'No match found, all endorsements exhausted';
-                EXIT;
-            END IF;
-
-            -- Drop the first endorsement in the array
-            current_endorsements := jsonb_set(current_endorsements, ARRAY['0'], 'null'::jsonb, true);
-            current_endorsements := jsonb_strip_nulls(current_endorsements);
-
-            -- Try for a partial match
-            FOR result IN SELECT * FROM attempt_match(party_size, current_endorsements, req_start_time, req_end_time)
-                LOOP
-                    RETURN QUERY SELECT result.restaurant_name, result.matched_endorsements, 'Partial match found';
-                    match_found := true;
-                    EXIT;
-                END LOOP;
-        ELSE
-            EXIT;
-        END IF;
-    END LOOP;
-
-    IF NOT match_found THEN
-        RAISE NOTICE 'No match found';
+    -- Step 3: Check if any restaurants match the endorsements
+    IF NOT EXISTS (
+        SELECT 1
+        FROM restaurants r
+        WHERE r.endorsements @> current_endorsements
+    ) THEN
+        -- Raise an exception if no restaurants match the endorsements
+        RAISE EXCEPTION 'No restaurants match the given endorsements';
     END IF;
+
+    -- Step 4: Proceed with normal availability check if matches are found
+    RETURN QUERY
+        SELECT r.name::text, r.endorsements, 'Match found'::text
+        FROM restaurants r
+        WHERE r.endorsements @> current_endorsements
+          AND r.opening_time <= req_start_time::time
+          AND r.closing_time >= req_end_time::time
+          AND (cast(r.capacity->>'two-top' as integer) * 2) +
+              (cast(r.capacity->>'four-top' as integer) * 4) +
+              (cast(r.capacity->>'six-top' as integer) * 6) >= party_size
+          AND NOT EXISTS (
+            SELECT 1
+            FROM reservations res
+            WHERE res.restaurant_id = r.id
+              AND (res.start_time, res.end_time) OVERLAPS (req_start_time, req_end_time)
+        );
 END;
 $$ LANGUAGE plpgsql;

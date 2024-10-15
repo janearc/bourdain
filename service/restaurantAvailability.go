@@ -47,6 +47,17 @@ func restaurantAvailability(w http.ResponseWriter, r *http.Request, db *sql.DB) 
 	query := "SELECT * FROM check_restaurant_availability($1::uuid[], $2, $3);"
 	rows, err := db.Query(query, pq.Array(dinerUUIDs), startTime, endTime)
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code.Name() == "raise_exception" {
+			// Handle the case where the database raises a specific exception (e.g., "No restaurants match the given endorsements")
+			logrus.Warnf("No restaurants matched the given endorsements: %v", pqErr)
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode([]map[string]string{}); err != nil {
+				logrus.Errorf("Error encoding empty response: %v", err)
+				http.Error(w, "Error encoding response", http.StatusInternalServerError)
+			}
+			return
+		}
+
 		logrus.Errorf("Error querying availability: %v", err)
 		http.Error(w, "Error querying database", http.StatusInternalServerError)
 		return
